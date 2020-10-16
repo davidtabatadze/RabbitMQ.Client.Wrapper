@@ -1,2 +1,2 @@
 # RabbitMq.Client.Wrapper
-RabbitMq.Client wrapper for .Net and .NetCore
+RabbitMq.Client wrapper for .net
