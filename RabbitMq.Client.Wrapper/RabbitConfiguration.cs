@@ -1,11 +1,11 @@
-﻿using Newtonsoft.Json;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using CoreKit.Extension.String;
 
 namespace RabbitMq.Client.Wrapper
 {
 
     /// <summary>
-    /// Represents RabbitMQ configuration <see cref="Rabbit"/>
+    /// Represents RabbitMQ configuration <see cref="RabbitBase"/>
     /// </summary>
     public class RabbitConfiguration
     {
@@ -23,7 +23,7 @@ namespace RabbitMq.Client.Wrapper
         /// <summary>
         /// Host(s) port
         /// </summary>
-        public short Port { get; set; }
+        public ushort Port { get; set; }
 
         /// <summary>
         /// Host(s) user
@@ -43,17 +43,27 @@ namespace RabbitMq.Client.Wrapper
         /// <summary>
         /// ექსჩეინჯ-რიგის სახელი
         /// </summary>
-        public bool QueueExchange { get; set; }
+        public string Exchange { get; set; }
 
         /// <summary>
-        /// შეცდომების რიგის სახელი
+        /// ???
         /// </summary>
-        public string QueueError { get; set; }
+        public string ExchangeType { get; set; }
 
         /// <summary>
-        /// Message time to live
+        /// ???
         /// </summary>
-        public long MessageTTL { get; set; }
+        public List<string> RoutingKeys { get; set; }
+
+        ///// <summary>
+        ///// შეცდომების რიგის სახელი
+        ///// </summary>
+        //public string QueueError { get; set; }
+
+        /////// <summary>
+        /////// Message time to live
+        /////// </summary>
+        ////public ulong MessageTTL { get; set; }
 
         /// <summary>
         /// Grouping size for messages
@@ -63,27 +73,29 @@ namespace RabbitMq.Client.Wrapper
         /// <summary>
         /// Consumer workers count
         /// </summary>
-        public short Workers { get; set; }
+        public ushort Workers { get; set; }
 
         /// <summary>
-        /// შეერთებული სახელის აღება
+        /// ???
         /// </summary>
-        /// <param name="index">მიმდინარე ნომერი</param>
-        /// <returns>შეერთებული სახელი</returns>
-        public string GetCombinedName(short index)
+        public Dictionary<string, object> Arguments { get; set; }
+
+        public string GetName()
         {
-            return Queue + " " + "[" + Workers + "-" + index + "]";
+            return Queue.HasValue() ? Queue :
+                   Exchange.HasValue() ? ExchangeType + Exchange :
+                   "undefined";
         }
 
-        /// <summary>
-        /// კონფიგურაციის კოპირება
-        /// </summary>
-        /// <returns>ახალი კონფიგურაცია</returns>
-        public RabbitConfiguration Clone()
-        {
-            var json = JsonConvert.SerializeObject(this);
-            return JsonConvert.DeserializeObject<RabbitConfiguration>(json);
-        }
+        ///// <summary>
+        ///// კონფიგურაციის კოპირება
+        ///// </summary>
+        ///// <returns>ახალი კონფიგურაცია</returns>
+        //public RabbitConfiguration Clone()
+        //{
+        //    var json = JsonConvert.SerializeObject(this);
+        //    return JsonConvert.DeserializeObject<RabbitConfiguration>(json);
+        //}
 
     }
 
