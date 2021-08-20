@@ -1,99 +1,261 @@
-﻿using CoreKit.Extension.Collection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
-using System;
-using System.Collections.Generic;
+﻿using System;
+using System.Linq;
 using System.Text;
-using System.Timers;
-using System.Threading;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
+using RabbitMQ.Client;
+
 
 namespace RabbitMq.Client.Wrapper
 {
 
-
-    public class RabbitConsumer<T> : RabbitBase<T>
+    /// <summary>
+    /// Represents message consume functionality
+    /// </summary>
+    /// <typeparam name="T">Type of the message</typeparam>
+    public abstract class RabbitConsumer<T> : RabbitBase
     {
 
+        #region Helpers
 
-
-        public RabbitConsumer(RabbitConfiguration configuration, ILogger logger = null) : base(configuration, logger)
+        /// <summary>
+        /// Represents retry message publisher
+        /// </summary>
+        private class RetryPublisher : RabbitPublisher<T>
         {
-            ssss();
 
-            //for (int i = 0; i < length; i++)
-            //{
+            /// <summary>
+            /// Constructor
+            /// </summary>
+            /// <param name="configuration">Configuration</param>
+            public RetryPublisher(RabbitPublisherConfiguration configuration) : base(configuration) { }
 
-            //}
         }
 
-
-
-        private async Task ssss()
+        /// <summary>
+        /// Represents failed message publisher
+        /// </summary>
+        private class DeadPublisher : RabbitPublisher<RabbitDeadMessage>
         {
+
+            /// <summary>
+            /// Constructor
+            /// </summary>
+            /// <param name="configuration">Configuration</param>
+            public DeadPublisher(RabbitPublisherConfiguration configuration) : base(configuration) { }
+
+        }
+
+        #endregion
+
+        #region Properties
+
+        /// <summary>
+        /// Configuration
+        /// </summary>
+        public RabbitConsumerConfiguration Configuration { get; set; }
+
+        /// <summary>
+        /// Retry publisher
+        /// </summary>
+        private RetryPublisher Retry { get; set; }
+
+        /// <summary>
+        /// Dead publisher
+        /// </summary>
+        private DeadPublisher Dead { get; set; }
+
+
+        #endregion
+
+        #region Constructors
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="configuration">Configuration</param>
+        /// <param name="logger">Logger</param>
+        public RabbitConsumer(RabbitConsumerConfiguration configuration, ILogger logger = null) : base(configuration, logger)
+        {
+            // ...
+            Configuration = configuration;
+            Retry = new RetryPublisher(Configuration.RetryExchangeConfiguration);
+            Dead = new DeadPublisher(Configuration.DeadQueueConfiguration);
+            // Creating consumers (a.k.a workers)
             for (int i = 0; i < Channels.Count; i++)
             {
-                // 
-                Thread.Sleep(1000);
-                // რიგის გამომყენებლის მიმთითებლის შექმნა
+                // Current channel
                 var channel = Channels[i];
-                var consumer = new RabbitConsumerBase<T>(channel);
-                var consumerName = string.Format("{0}-{1}-{2}", "consumer", Configuration.GetName(), i + 1);
-                OnStart(consumerName);
-
-                // Action for recieve messages
-                consumer.Received += (sender, args) =>
+                // Declaring consumer
+                var name = Configuration.Name + "[consumer-" + (i + 1) + "]";
+                var consumer = new RabbitConsumerBase<T>(channel, name, Configuration.BatchSize);
+                // The consumer will not recive messages, until current is not handled
+                channel.BasicQos(0, Configuration.BatchSize, false);
+                // Binding queue to the consumer
+                // Message(s) will not be deleted automatically
+                // The consumer will wait acknowledgement to do so
+                channel.BasicConsume(Configuration.Name, false, consumer);
+                // Action for recieve message(s)
+                consumer.Received += (sender, package) =>
                 {
-                    // Defining the message body
-                    var body = Encoding.UTF8.GetString(args.Body.ToArray());
+                    // Defining the package body
+                    var body = Encoding.UTF8.GetString(package.Body.ToArray());
+                    // Trying to preserve the body as actual message
                     try
                     {
                         // Convert to actual typed message
-                        var message = JsonConvert.DeserializeObject<T>(body);
-
-
-                        Console.WriteLine("===DONE=== " + message);
-                        channel.BasicAck(deliveryTag: args.DeliveryTag, multiple: false);
-
-
-                        //channel.BasicReject(args.DeliveryTag, true);
-
+                        var message = JsonSerializer.Deserialize<T>(body);
+                        // Defining the next delay
+                        var previous = (object)0;
+                        if (package.BasicProperties.Headers != null)
+                        {
+                            package.BasicProperties.Headers.TryGetValue(RabbitAnnotations.Retry.HeaderKey, out previous);
+                        }
+                        var delay = Configuration.RetryIntervals.FirstOrDefault(interval =>
+                            interval > (ulong)Math.Abs(Convert.ToInt64(previous))
+                        );
                         // Preserve the message, make it ready for handling
-                        //consumer.Preserve(args.DeliveryTag, message);
+                        consumer.Preserve(message, package.DeliveryTag, delay);
                     }
-                    catch (Exception e)
+                    // If something went wrong on this stage ...
+                    catch (Exception exception)
                     {
-                        var ec = 0;
+                        // Retrying it does not make sence
+                        Task.Run(async () =>
+                        {
+                            // We do kill the message
+                            await Handle(exception, new List<string> { body });
+                            // ???
+                            channel.BasicReject(package.DeliveryTag, false);
+                        });
                     }
                 };
-                // Action for handle messages
-                consumer.Handle += (tag, messages) =>
+                // Action for handle message(s)
+                consumer.Handle += (packages, tag, consumer) =>
                 {
-                    Console.WriteLine("davai dahendle " + messages.Count);
+                    // Run hendling
+                    Task.Run(async () =>
+                    {
+                        // Trying to handle message(s)
+                        try
+                        {
+                            // Handling single message
+                            if (Configuration.BatchSize == 1)
+                            {
+                                await Handle(packages[0].Message, consumer);
+                            }
+                            // Handling grouped messages
+                            else
+                            {
+                                await Handle(packages.Select(m => m.Message), consumer);
+                            }
+                        }
+                        // In case if something goes wrong
+                        // We either retry the message(s) or kill them
+                        catch (Exception exception)
+                        {
+                            // Hanle retry
+                            await Handle(
+                                exception,
+                                packages.Where(package => package.Delay > 0)
+                            );
+                            // Hanle dead
+                            await Handle(
+                                exception,
+                                packages.Where(package => package.Delay == 0)
+                                        .Select(package => JsonSerializer.Serialize(package.Message))
+                            );
+                        }
+                        // In any case, message(s) will be deleted from the queue
+                        finally
+                        {
+                            // Suggestion, that everything is ok and we can delete the message(s) from the queue
+                            channel.BasicAck(tag, true);
+                        }
+                    });
                 };
-
-
-                // გამომყენებელი აღარ მიიღებს ზედმეტ შეტყობინებებს, სანამ არსებულებს არ დაამუშავებს
-                channel.BasicQos(0, Configuration.BatchSize, false);
-                // რიგის გამომყენებლის აწყობა-დაკონფიგურირება
-                channel.BasicConsume(
-                    queue: Configuration.Queue,
-                    // შეტყობინების წაშლა ავტომატურად არ მოხდება - 
-                    // უნდა დაველოდოთ "მინიშნებას" რომ შეტყობინება დამუშავდა
-                    autoAck: false,
-                    consumer: consumer
-                );
-
             }
         }
 
-        private void HandleException(IModel channel, ulong tag)
+        #endregion
+
+        #region Handlers
+
+        /// <summary>
+        /// Handle exception with message retry
+        /// </summary>
+        /// <param name="exception">Arosed exception</param>
+        /// <param name="packages">Failed messages with delay milliseconds</param>
+        /// <returns>Task</returns>
+        private async Task Handle(Exception exception, IEnumerable<(T Message, ulong Delay)> packages)
         {
-            channel.BasicReject(tag, false);
+            // Publish retry
+            foreach (var (Message, Delay) in packages)
+            {
+                await Retry.Publish(Message, Delay);
+            }
         }
+
+        /// <summary>
+        /// Handle exception with message kill
+        /// </summary>
+        /// <param name="exception">Arosed exception</param>
+        /// <param name="messages">Failed messages</param>
+        /// <returns></returns>
+        private async Task Handle(Exception exception, IEnumerable<string> messages)
+        {
+            // Publish dead
+            await Dead.Publish(messages.Select(message => new RabbitDeadMessage
+            {
+                ExceptionType = exception.GetType().ToString(),
+                Exception = exception.Message,
+                MessageType = typeof(T).ToString(),
+                Message = message
+            }));
+        }
+
+        /// <summary>
+        /// Handle single message
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="consumer">Consumer name</param>
+        /// <returns>Task</returns>
+        public virtual async Task Handle(T message, string consumer)
+        {
+            // This should be overriden
+            await Task.Run(() =>
+            {
+                throw new NotImplementedException(RabbitAnnotations.Exception.ConsumerHandlerSingle);
+            });
+        }
+
+        /// <summary>
+        /// Handle batch messages
+        /// </summary>
+        /// <param name="messages">Messages</param>
+        /// <param name="consumer">Consumer name</param>
+        /// <returns>Task</returns>
+        public virtual async Task Handle(IEnumerable<T> messages, string consumer)
+        {
+            // This should be overriden
+            await Task.Run(() =>
+            {
+                throw new NotImplementedException(RabbitAnnotations.Exception.ConsumerHandlerMultiple);
+            });
+        }
+
+        #endregion
+
+
+
+
+
+
+
+
+
 
         public virtual void OnStart(string consumer)
         {
@@ -102,10 +264,7 @@ namespace RabbitMq.Client.Wrapper
             Console.WriteLine("starting rabbit channel " + consumer);
         }
 
-        public virtual async Task Handle(string consumer, T message)
-        {
-            throw new NotImplementedException();
-        }
+
 
 
     }

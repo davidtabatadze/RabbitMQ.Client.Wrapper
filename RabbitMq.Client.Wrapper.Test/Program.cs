@@ -1,211 +1,50 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using Newtonsoft.Json;
+using RabbitMQ.Client;
 
 namespace RabbitMq.Client.Wrapper.Test
 {
     class Program
     {
 
-        /// <summary>
-        /// ტრანზაქციის დამატებითი კონტექსტური მონაცემები
-        /// </summary>
-        public class Context
-        {
+        //public abstract class Dodo
+        //{
+        //    public int MyProperty { get; set; }
+        //    public string MyProperty2 { get; set; }
 
-            /// <summary>
-            /// კლიენტის ნაწილი (კლიენტის მიერ გამოგზავნილი დამატებითი პარამეტრები უცვლელად)
-            /// </summary>
-            [JsonProperty("rq", NullValueHandling = NullValueHandling.Ignore)]
-            public Dictionary<string, object> Request { get; set; }
+        //    public string OK()
+        //    {
+        //        return "ok";
+        //    }
+        //}
+        //public class voo : Dodo { }
 
-            /// <summary>
-            /// ოპტიოს ნაწილი (კატეგორიზაციის დამატებითი მონაცემები, აღწერები, ინსტრუქციები და ა.შ.)
-            /// </summary>
-            [JsonProperty("rp", NullValueHandling = NullValueHandling.Ignore)]
-            public Dictionary<string, object> Response { get; set; }
+        //public interface iii
+        //{
+        //    public int MyProperty { get; set; }
+        //}
 
-        }
+        //public class jjj : iii
+        //{
+        //    public int MyProperty { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        //}
 
-        /// <summary>
-        /// ტრანზაქციის გატარების/გადახდის მდებარეობა - ტერმინალის მდებარეობა
-        /// </summary>
-        public class Location
-        {
-
-            /// <summary>
-            /// ქვეყანა
-            /// </summary>
-            [JsonProperty("cu", NullValueHandling = NullValueHandling.Ignore)]
-            public string Country { get; set; }
-
-            /// <summary>
-            /// ქალაქი
-            /// </summary>
-            [JsonProperty("ct", NullValueHandling = NullValueHandling.Ignore)]
-            public string City { get; set; }
-
-            /// <summary>
-            /// მისამართი
-            /// </summary>
-            [JsonProperty("ad", NullValueHandling = NullValueHandling.Ignore)]
-            public string Address { get; set; }
-
-            /// <summary>
-            /// გრძედი
-            /// </summary>
-            [JsonProperty("lo", NullValueHandling = NullValueHandling.Ignore)]
-            public double Longitude { get; set; }
-
-            /// <summary>
-            /// განედი
-            /// </summary>
-            [JsonProperty("la", NullValueHandling = NullValueHandling.Ignore)]
-            public double Latitude { get; set; }
-
-        }
-
-        /// <summary>
-        /// დაკატეგორიზებული ტრანზაქცია
-        /// </summary>
-        public class Outcome
-        {
-
-            /// <summary>
-            /// ტრანზაქციის იდენთიფიკატორი - უნიკალური გასაღები
-            /// </summary>
-            [JsonProperty("id")]
-            public string Id { get; set; }
-
-            /// <summary>
-            /// კონტექსტური და/ან დამატებითი მონაცემები
-            /// </summary>
-            [JsonProperty("ct", NullValueHandling = NullValueHandling.Ignore)]
-            public Context Context { get; set; }
-
-            /// <summary>
-            /// ტრანზაქციის გატარების/გადახდის მდებარეობა - ტერმინალის მდებარეობა
-            /// </summary>
-            [JsonProperty("lc", NullValueHandling = NullValueHandling.Ignore)]
-            public Location Location { get; set; }
-
-            /// <summary>
-            /// გატარების/გადახდის ტერმინალი
-            /// </summary>
-            [JsonProperty("tr", NullValueHandling = NullValueHandling.Ignore)]
-            public string Terminal { get; set; }
-
-            /// <summary>
-            /// კატეგორიის წარმომავლობა merchant | mcc | rule | none
-            /// </summary>
-            [JsonProperty("co")]
-            public string CategoryOrigin { get; set; }
-
-            /// <summary>
-            /// rule წარმომავლობის შესაბამისი წესი - სახელი
-            /// </summary>
-            [JsonProperty("cr", NullValueHandling = NullValueHandling.Ignore)]
-            public string CategoryRule { get; set; }
-
-            /// <summary>
-            /// კატეგორიის გასაღები
-            /// </summary>
-            [JsonProperty("ci")]
-            public int CategoryId { get; set; }
-
-            /// <summary>
-            /// კატეგორიის სახელი
-            /// </summary>
-            [JsonProperty("cn")]
-            public string CategoryName { get; set; }
-
-            /// <summary>
-            /// მშობელი(ზედა) კატეგორიის კოდი
-            /// </summary>
-            [JsonProperty("pi")]
-            public int CategoryParentId { get; set; }
-
-            /// <summary>
-            /// მშობელი(ზედა) კატეგორიის სახელი
-            /// </summary>
-            [JsonProperty("pn")]
-            public string CategoryParentName { get; set; }
-
-            /// <summary>
-            /// ტიპის გასაღები
-            /// </summary>
-            [JsonProperty("ti")]
-            public short TypeId { get; set; }
-
-            /// <summary>
-            /// ტიპის სახელი
-            /// </summary>
-            [JsonProperty("tn")]
-            public string TypeName { get; set; }
-
-            /// <summary>
-            /// დადასტურებული მერჩანტი
-            /// </summary>
-            [JsonProperty("mr", NullValueHandling = NullValueHandling.Ignore)]
-            public string Merchant { get; set; }
-
-        }
-
-        /// <summary>
-        /// კატეგორიზაციის შედეგი
-        /// </summary>
-        public class Response
-        {
-
-            /// <summary>
-            /// კატეგორიზაციის ვერსია
-            /// </summary>
-            [JsonProperty("vr")]
-            public string Version { get; set; }
-
-            /// <summary>
-            /// დაკატეგორიზებული მონაცემები
-            /// </summary>
-            [JsonProperty("dt")]
-            public List<Outcome> Outcomes { get; set; }
-
-        }
-
-        public abstract class Dodo
-        {
-            public int MyProperty { get; set; }
-            public string MyProperty2 { get; set; }
-
-            public string OK()
-            {
-                return "ok";
-            }
-        }
-        public class voo : Dodo { }
-
-        public interface iii
-        {
-            public int MyProperty { get; set; }
-        }
-
-        public class jjj : iii
-        {
-            public int MyProperty { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        }
-
-        class EV
-        {
-            public event EventHandler Event;
-            public void Raise()
-            {
-                Event.Invoke(this, EventArgs.Empty);
-                Console.WriteLine("ok, raised");
-            }
-        }
+        //class EV
+        //{
+        //    public event EventHandler Event;
+        //    public void Raise()
+        //    {
+        //        Event.Invoke(this, EventArgs.Empty);
+        //        Console.WriteLine("ok, raised");
+        //    }
+        //}
 
         static async Task Main(string[] args)
         {
+
+
 
 
             //var ddd = new voo { };
@@ -223,29 +62,278 @@ namespace RabbitMq.Client.Wrapper.Test
             //Console.ReadKey();
             //return;
 
-            //https://blog.rabbitmq.com/posts/2015/04/scheduling-messages-with-rabbitmq
-            // https://github.com/rabbitmq/rabbitmq-delayed-message-exchange
-            // https://engineering.nanit.com/rabbitmq-retries-the-full-story-ca4cc6c5b493
-            // https://olegkarasik.wordpress.com/2019/04/16/code-tip-how-to-work-with-asynchronous-event-handlers-in-c/
+           
             Console.WriteLine("starting ...\n\n\n");
 
+            //var aaa = new List<uint> { 1, 2, 3 };
+            //var next = aaa.FirstOrDefault(i => i > 5);
+            //var bbb = 0;
+            //var fff = -bbb;
 
 
-            //using (var pub = new Publisher1(new RabbitPublisherConfiguration
+            //Dictionary<string, long> llll = new Dictionary<string, long> { { "ok", -9 } };
+            //var delay = (long)0;
+            //if (llll != null)
+            //{
+            //    llll.TryGetValue("ok", out delay);
+            //}
+            //var walodjwaod = 0;
+
+
+
+            try
+            {
+
+
+                //using (var con = new RconsumerDead(new RabbitConsumerConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "rabbit-queue-dead"
+                //}))
+                //{
+
+                //}
+
+                //using (var con = new Rconsumer(new RabbitConsumerConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "rabbit-queue",
+                //    //RetryIntervals = new List<ulong> { 10000, 20000 },
+                //    Workers = 5,
+                //    //BatchSize = 5
+                //}, new RpublisherSuccess(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "rabbit-success",
+                //})))
+                //{
+
+                //}
+
+
+                //using (var pub = new RpublisherSpoiled(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "rabbit-queue"
+                //}))
+                //{
+                //    for (int i = 1; i <= 1; i++)
+                //    {
+                //        await pub.Publish("abrakatabra" + i);
+                //    }
+                //}
+
+                //using (var pub = new Rpublisher(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "rabbit-queue"
+                //}))
+                //{
+                //    var msg = new List<TestMessage> { };
+                //    var cnt = 0;
+                //    for (int i = 1; i <= 1; i++)
+                //    {
+                //        msg.Add(new TestMessage { Id = i, Name = "dt" + i });
+                //        if (msg.Count == 1)
+                //        {
+                //            cnt += msg.Count;
+                //            Console.WriteLine("messages " + cnt);
+                //            System.Threading.Thread.Sleep(new Random().Next(0, 500));
+                //            await pub.Publish(msg);
+                //            msg = new List<TestMessage> { };
+                //        }
+                //    }
+                //}
+
+                //using (var pub = new RpublisherSpoiled(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "rabbit-queue"
+                //}))
+                //{
+                //    for (int i = 1; i <= 1000; i++)
+                //    {
+                //        await pub.Publish("abrakatabra" + i);
+                //    }
+                //}
+
+                //using (var del = new RabbitPublisher<string>(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "rabbit-queue-retry",
+                //    Type = RabbitRetry.DelayExchangeType,
+                //    Arguments = RabbitRetry.DelayExchangeArguments
+                //}))
+                //{
+                //    await del.Publish("del-olaaa");
+                //    await del.Publish("del-bolaaa", new Dictionary<string, object> { { "x-delay", 10000 } });
+                //    await del.Publish("del-kolaaa", new Dictionary<string, object> { { "x-delay", 20000 } });
+                //}
+
+
+
+
+                //using (var coo = new RabbitConsumer<string>(new RabbitConsumerConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "delay-queue",
+                //    Bindings = new Dictionary<string, string> { { "delay-queue", "delay-fanout" } }
+                //}))
+                //{
+
+                //}
+
+                //using (var del = new RabbitPublisher<string>(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "delay-fanout",
+                //    Type = "x-delayed-message",
+                //    //Routings = new List<string> { "dtest" },
+                //    Arguments = new Dictionary<string, object> { { "x-delayed-type", "fanout" } },
+                //    Headers = new Dictionary<string, object> { { "x-delay", 10000 } }
+                //}))
+                //{
+                //    await del.Publish("del-olaaa");
+                //    await del.Publish("del-bolaaa");
+                //    await del.Publish("del-kolaaa", new Dictionary<string, object> { { "x-delay", 30000 } });
+                //}
+
+                //using (var del = new RabbitPublisher<string>(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "fun-fun",
+                //    Type = "fanout"
+                //}))
+                //{
+                //    await del.Publish("del-olaaa");
+                //    await del.Publish("del-bolaaa");
+                //    await del.Publish("del-kolaaa", new Dictionary<string, object> { { "x-delay", 30000 } });
+                //}
+
+
+                //using (var del = new RabbitPublisher<string>(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "ex-delay-test",
+                //    Type = "x-delayed-message",
+                //    //Routings = new List<string> { "dtest" },
+                //    Arguments = new Dictionary<string, object> { { "x-delayed-type", "fanout" } },
+                //    Headers = new Dictionary<string, object> { { "x-delay", 10000 } }
+                //}))
+                //{
+                //    await del.Publish("del-olaaa");
+                //    await del.Publish("del-bolaaa");
+                //    await del.Publish("del-kolaaa", new Dictionary<string, object> { { "x-delay", 30000 } });
+                //}
+
+                //using (var del = new RabbitPublisher<string>(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "ex-delay-concurent",
+                //    Type = "direct",
+                //    Routings = new List<string> { "gooo" }
+                //}))
+                //{
+                //    await del.Publish("concurent - 1");
+                //}
+
+                //using (var del = new RabbitPublisher<string>(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "ex-delay-queue"
+                //}))
+                //{
+                //    await del.Publish("priamoi");
+                //}
+
+                //Console.WriteLine("ok");
+                //return;
+
+                //using (var con = new Rconsumer(new RabbitConsumerConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "exchange-fun-queue-dle",
+                //    Bindings = new Dictionary<string, string> { { "-", "exchange-fun" } },
+                //    BatchSize = 2,
+                //    Workers = 0,
+                //    RetryIntervals = new List<ulong> { },
+                //    Arguments = new Dictionary<string, object> { { "x-dead-letter-exchange", "some.exchange.name" } }
+                //}))
+                //{
+                //    var dt = 0;
+                //}
+
+                //using (var pub = new Publisher1(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "exchange-fun",
+                //    Type = "fanout"
+                //}))
+                //{
+                //    for (int i = 0; i < 2; i++)
+                //    {
+                //        // await pub.Publish("ola" + i);
+                //        //await pub.Publish((string)null);
+                //        //await pub.Publish(string.Empty);
+                //        //await pub.Publish(new List<string> { "" });
+                //        //await pub.Publish(new List<string> { "   " });
+                //        //await pub.Publish(new List<string> { "-" });
+                //    }
+                //}
+
+                //using (var pub = new Publisher1(new RabbitPublisherConfiguration
+                //{
+                //    Hosts = new List<string> { "localhost" },
+                //    Name = "test-exchange-direct",
+                //    Type = "direct",
+                //    Queues = new List<RabbitPublisherConfiguration.Queue> {
+                //        new RabbitPublisherConfiguration.Queue { Name = "test-exchange-direct-queue1", RoutingKeys = new List<string>{ "" } },
+                //        new RabbitPublisherConfiguration.Queue { Name = "test-exchange-direct-queue2", RoutingKeys = new List<string>{ "" } }
+                //    }
+                //}))
+                //{
+                //    await pub.Publish(new List<string> { "OLA" }, "test-exchange-direct-queue1");
+                //    await pub.Publish(new List<string> { "OLA" }, "test-exchange-direct-queue2");
+                //}
+
+
+
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("!!! exception: " + e.Message);
+            }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            //using (var con = new Consumer1(new RabbitConsumerConfiguration
             //{
             //    Hosts = new List<string> { "localhost" },
-            //    Name = "test-exchange-direct",
-            //    Type = "direct",
-            //    Queues = new List<RabbitPublisherConfiguration.Queue> {
-            //        new RabbitPublisherConfiguration.Queue { Name = "dodo-direct", RoutingKeys = new List<string>{ "okok" } },
-            //        new RabbitPublisherConfiguration.Queue { Name = "dudu-direct", RoutingKeys = new List<string>{ "koko" } }
-            //    }
+            //    Name = "dodo-direct",
+            //    Workers = 1
             //}))
             //{
-            //    await pub.Publish(new List<string> { "OLA" }, "okok");
-            //    await pub.Publish(new List<string> { "OLA" }, "koko");
-            //    await pub.Publish(new List<string> { "OLA" }, "dodo");
+            //    Console.WriteLine("con1");
             //}
+
+
 
 
             //using (var pub = new Publisher1(new RabbitPublisherConfiguration
@@ -401,63 +489,11 @@ namespace RabbitMq.Client.Wrapper.Test
             //
 
 
-            using (var pub2 = new PublisherAlta(new RabbitPublisherConfiguration
-            {
-                Hosts = new List<string> { "amqp.altasoft.ge" },
-                VirtualHost = "OptioAi",
-                Port = 5672, // 5672
-                User = "optioai",
-                Password = "optioai",
-                Name = "OptioAiTestResults"
-            }))
-            {
-                await pub2.Publish(new Response
-                {
-                    Version = "0.0",
-                    Outcomes = new List<Outcome>
-                    {
-                        new Outcome {
-                            Id = "333",
-                            //Context = new Context {
-                            //    Request = new Dictionary<string, object> { { "hi", "ola" } },
-                            //    Response = new Dictionary<string, object> { { "bye", "pk" } }
-                            //},
-                            //Location = new Location {
-                            //    Country = "georgia",
-                            //    City = "tbilisi",
-                            //    Address = "abashidze",
-                            //    Longitude = 1.11,
-                            //    Latitude = 2.22
-                            //},
-                            //Terminal = "t001",
-                            CategoryOrigin = "merchant",
-                            CategoryRule = "some-rule",
-                            CategoryId = 222,
-                            CategoryName = "222",
-                            CategoryParentId = 111,
-                            CategoryParentName = "111",
-                            TypeId = 333,
-                            TypeName = "333",
-                            Merchant = "goodwill"
-                        }
-                    }
-                });
-            }
-
             //var x = 0;
 
-            //using (var con2 = new Consumer2(new RabbitConfiguration
-            //{
-            //    Hosts = new List<string> { "amqp.altasoft.ge" },
-            //    VirtualHost = "OptioAi",
-            //    Port = 5672, // 5672
-            //    UserName = "optioai",
-            //    Password = "optioai",
-            //    Queue = "OptioAiTestEvents"
-            //}))
-            //{
-            //    Console.WriteLine("con2");
-            //}
+
+
+
 
             //new RabbitPublisherConfiguration { Type = "", Queues = null };
 

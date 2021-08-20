@@ -1,22 +1,20 @@
 ﻿using System;
-using System.Text;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
-using RabbitMQ.Client;
-using Newtonsoft.Json;
-using CoreKit.Extension.String;
-using CoreKit.Extension.Collection;
 using Microsoft.Extensions.Logging;
+using RabbitMQ.Client;
 
 namespace RabbitMq.Client.Wrapper
 {
 
     /// <summary>
-    /// 
+    /// Represents message publish functionality
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    public class RabbitPublisher<T> : RabbitBase2
+    /// <typeparam name="T">Type of the message</typeparam>
+    public abstract class RabbitPublisher<T> : RabbitBase
     {
 
         #region Constructor
@@ -30,15 +28,16 @@ namespace RabbitMq.Client.Wrapper
         {
             // ...
             Configuration = configuration;
-            if (configuration.Queues.HasValue())
-            {
-                RoutingKeys = configuration.Queues.SelectMany(s => s.RoutingKeys ?? new List<string> { }).ToList();
-            }
             // Declaring publish properties.
+            PublishProperties = Channel.CreateBasicProperties();
+            PublishProperties.Headers = new Dictionary<string, object> { };
             // Persistent means, that message will be saved on hard disk
             // So it will never dissapear until deleted purposely
-            PublishProperties = Channel.CreateBasicProperties();
             PublishProperties.Persistent = true;
+            // Defining the destination
+            Destination = Configuration.Exchange ? Configuration.Name : string.Empty;
+            // Defining the dafault road
+            DefaultRoute = Configuration.Routings.Count > 1 ? string.Empty : Configuration.Routings.First();
         }
 
         #endregion
@@ -51,30 +50,19 @@ namespace RabbitMq.Client.Wrapper
         public RabbitPublisherConfiguration Configuration { get; set; }
 
         /// <summary>
-        /// 
-        /// </summary>
-        private List<string> RoutingKeys { get; set; }
-
-        /// <summary>
         /// Publish properties
         /// </summary>
         private IBasicProperties PublishProperties { get; set; }
 
         /// <summary>
-        /// Either the route is fanout or not.
-        /// </summary>
-        private bool FanRoute { get { return Configuration.Type == ExchangeType.Fanout; } }
-
-        /// <summary>
         /// Defines the default route
         /// </summary>
-        private string DefaultRoute
-        {
-            get
-            {
-                return RoutingKeys.Count > 1 ? string.Empty : RoutingKeys.First();
-            }
-        }
+        private string DefaultRoute { get; set; }
+
+        /// <summary>
+        /// Publish destination - name of the exchange or queue
+        /// </summary>
+        private string Destination { get; set; }
 
         #endregion
 
@@ -87,7 +75,37 @@ namespace RabbitMq.Client.Wrapper
         /// <returns>Valid / Not valid</returns>
         private bool ValidateRoute(string route)
         {
-            return FanRoute || RoutingKeys.Contains(route);
+            return Configuration.Exchange == false || Configuration.Fanout || Configuration.Routings.Contains(route);
+        }
+
+        /// <summary>
+        /// Getting publish headers
+        /// </summary>
+        /// <param name="merge">Headers per publish</param>
+        /// <returns>Publish headers</returns>
+        private Dictionary<string, object> PublishHeaders(Dictionary<string, object> merge)
+        {
+            // Defining default headers
+            var sources = Configuration.Headers == null ? new List<(string Key, object Value)> { } :
+                          Configuration.Headers.Select(h => (h.Key, h.Value)).ToList();
+            // Defining publish headers
+            sources.AddRange(merge == null ? new List<(string Key, object Value)> { } :
+                            merge.Select(h => (h.Key, h.Value)).ToList());
+            // Merging headers
+            var headers = new Dictionary<string, object> { };
+            foreach (var (Key, Value) in sources)
+            {
+                if (headers.ContainsKey(Key))
+                {
+                    headers[Key] = Value;
+                }
+                else
+                {
+                    headers.Add(Key, Value);
+                }
+            }
+            // Returning final headers
+            return headers;
         }
 
         #endregion
@@ -95,68 +113,101 @@ namespace RabbitMq.Client.Wrapper
         #region Publish functionality
 
         /// <summary>
-        /// Publish
+        /// 
         /// </summary>
-        /// <param name="messages">T messages</param>
-        /// <returns>Empty</returns>
-        public virtual async Task Publish(IEnumerable<T> messages)
+        /// <param name="messages"></param>
+        /// <returns></returns>
+        public async Task Publish(IEnumerable<T> messages)
         {
             // Publishing ...
             await Publish(messages, DefaultRoute);
         }
 
         /// <summary>
-        /// Publish
+        /// 
         /// </summary>
-        /// <param name="messages">T messages</param>
-        /// <param name="route">Routing key</param>
-        /// <returns>Empty</returns>
-        public virtual async Task Publish(IEnumerable<T> messages, string route)
+        /// <param name="messages"></param>
+        /// <param name="route"></param>
+        /// <returns></returns>
+        public async Task Publish(IEnumerable<T> messages, string route)
         {
             // Publishing ...
-            foreach (var message in messages)
+            if (messages != null)
             {
-                // Each message
-                await Publish(message, route);
+                foreach (var message in messages)
+                {
+                    await Publish(message, route);
+                }
             }
         }
 
         /// <summary>
-        /// Publish
+        /// 
         /// </summary>
-        /// <param name="message">T message</param>
-        /// <returns>Empty</returns>
-        public virtual async Task Publish(T message)
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public async Task Publish(T message)
         {
             // Publishing ...
             await Publish(message, DefaultRoute);
         }
 
         /// <summary>
-        /// Publish
+        /// 
         /// </summary>
-        /// <param name="message">T message</param>
-        /// <param name="route">Routing key</param>
-        /// <returns>Empty</returns>
-        public virtual async Task Publish(T message, string route)
+        /// <param name="message"></param>
+        /// <param name="route"></param>
+        /// <returns></returns>
+        public async Task Publish(T message, string route)
+        {
+            // Publishing ...
+            await Publish(message, route, null);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="delay"></param>
+        /// <returns></returns>
+        internal async Task Publish(T message, ulong delay)
+        {
+            // Publishing ...
+            await Publish(
+                message,
+                DefaultRoute,
+                new Dictionary<string, object> { { RabbitAnnotations.Retry.HeaderKey, (long)delay } }
+            );
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="route"></param>
+        /// <param name="headers"></param>
+        /// <returns></returns>
+        private async Task Publish(T message, string route, Dictionary<string, object> headers = null)
         {
             // Transforming T message to string
             var messageString = string.Empty;
             try
             {
-                // Validations 
+                // Validations
                 if (!ValidateRoute(route))
                 {
                     throw new ArgumentException(string.Format(RabbitAnnotations.Publish_NotImplementedException, route), "route");
                 }
+                // Preparing publish headers
+                PublishProperties.Headers = PublishHeaders(headers);
                 // Json representation of the message
-                messageString = JsonConvert.SerializeObject(message);
+                messageString = JsonSerializer.Serialize(message);
                 // Performing message publish
                 await Task.Run(() =>
                 {
                     // Publishing the message
-                    Channels[0].BasicPublish(
-                       exchange: Configuration.IsExchange ? Configuration.Name : string.Empty,
+                    Channel.BasicPublish(
+                       exchange: Destination,
                        routingKey: route, // .IsExchange ? "" : .Queue,
                        basicProperties: PublishProperties,
                        body: Encoding.UTF8.GetBytes(messageString)

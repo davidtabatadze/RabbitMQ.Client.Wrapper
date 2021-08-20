@@ -4,7 +4,7 @@ namespace RabbitMq.Client.Wrapper
 {
 
     /// <summary>
-    /// ???
+    /// Represents RabbitMQ configuration basis
     /// </summary>
     public abstract class RabbitConfigurationBase
     {
@@ -40,6 +40,11 @@ namespace RabbitMq.Client.Wrapper
         /// Depending of the configuration, the value is either exchange name or queue name
         /// </remarks>
         public string Name { get; set; }
+
+        /// <summary>
+        /// Additional arguments of the exchange/queue
+        /// </summary>
+        public Dictionary<string, object> Arguments { get; set; }
 
     }
 
