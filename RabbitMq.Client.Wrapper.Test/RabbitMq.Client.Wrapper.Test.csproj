@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,7 +6,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RabbitMq.Client.Wrapper\RabbitMq.Client.Wrapper.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RabbitMQ.Client.Wrapper\RabbitMQ.Client.Wrapper.csproj" />
   </ItemGroup>
 
 </Project>

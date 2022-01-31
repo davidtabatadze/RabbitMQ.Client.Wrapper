@@ -1,7 +1,6 @@
-﻿using RabbitMQ.Client;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
-namespace RabbitMq.Client.Wrapper
+namespace RabbitMQ.Client.Wrapper
 {
 
     /// <summary>
@@ -28,7 +27,7 @@ namespace RabbitMq.Client.Wrapper
         public List<string> Routings { get; set; }
 
         /// <summary>
-        /// ???
+        /// Publish headers
         /// </summary>
         public Dictionary<string, object> Headers { get; set; }
 

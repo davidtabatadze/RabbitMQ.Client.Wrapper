@@ -5,17 +5,16 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
 
 
-namespace RabbitMq.Client.Wrapper
+namespace RabbitMQ.Client.Wrapper
 {
 
     /// <summary>
     /// Represents message consume functionality
     /// </summary>
     /// <typeparam name="T">Type of the message</typeparam>
-    public abstract class RabbitConsumer<T> : RabbitBase
+    public class RabbitConsumer<T> : RabbitBase
     {
 
         #region Helpers
@@ -55,7 +54,7 @@ namespace RabbitMq.Client.Wrapper
         /// <summary>
         /// Configuration
         /// </summary>
-        public RabbitConsumerConfiguration Configuration { get; set; }
+        private RabbitConsumerConfiguration Configuration { get; set; }
 
         /// <summary>
         /// Retry publisher
@@ -82,15 +81,14 @@ namespace RabbitMq.Client.Wrapper
             // ...
             Configuration = configuration;
             Retry = new RetryPublisher(Configuration.RetryExchangeConfiguration);
-            Dead = new DeadPublisher(Configuration.DeadQueueConfiguration);
             // Creating consumers (a.k.a workers)
-            for (int i = 0; i < Channels.Count; i++)
+            for (short i = 0; i < Channels.Count; i++)
             {
                 // Current channel
                 var channel = Channels[i];
                 // Declaring consumer
-                var name = Configuration.Name + "[consumer-" + (i + 1) + "]";
-                var consumer = new RabbitConsumerBase<T>(channel, name, Configuration.BatchSize);
+                var consumer = new RabbitConsumerBase<T>(channel, Configuration.BatchSize);
+                OnStart(i);
                 // The consumer will not recive messages, until current is not handled
                 channel.BasicQos(0, Configuration.BatchSize, false);
                 // Binding queue to the consumer
@@ -106,7 +104,7 @@ namespace RabbitMq.Client.Wrapper
                     try
                     {
                         // Convert to actual typed message
-                        var message = JsonSerializer.Deserialize<T>(body);
+                        var message = JsonSerializer.Deserialize<T>(body, JsonOptions);
                         // Defining the next delay
                         var previous = (object)0;
                         if (package.BasicProperties.Headers != null)
@@ -127,13 +125,13 @@ namespace RabbitMq.Client.Wrapper
                         {
                             // We do kill the message
                             await Handle(exception, new List<string> { body });
-                            // ???
-                            channel.BasicReject(package.DeliveryTag, false);
+                            channel.BasicAck(package.DeliveryTag, false);
+                            // channel.BasicReject(package.DeliveryTag, false);
                         });
                     }
                 };
                 // Action for handle message(s)
-                consumer.Handle += (packages, tag, consumer) =>
+                consumer.Handle += (packages, tag) =>
                 {
                     // Run hendling
                     Task.Run(async () =>
@@ -141,34 +139,39 @@ namespace RabbitMq.Client.Wrapper
                         // Trying to handle message(s)
                         try
                         {
+                            // Handle beggin time
+                            var stamp = DateTime.Now;
+                            // Messages
+                            var messages = packages.Select(m => m.Message);
                             // Handling single message
                             if (Configuration.BatchSize == 1)
                             {
-                                await Handle(packages[0].Message, consumer);
+                                await Handle(packages[0].Message);
                             }
                             // Handling grouped messages
                             else
                             {
-                                await Handle(packages.Select(m => m.Message), consumer);
+                                await Handle(packages.Select(m => m.Message));
                             }
+                            OnHandled((DateTime.Now - stamp).TotalMilliseconds, messages.Count());
                         }
                         // In case if something goes wrong
                         // We either retry the message(s) or kill them
                         catch (Exception exception)
                         {
-                            // Hanle retry
+                            // Handle retry
                             await Handle(
                                 exception,
                                 packages.Where(package => package.Delay > 0)
                             );
-                            // Hanle dead
+                            // Handle dead
                             await Handle(
                                 exception,
                                 packages.Where(package => package.Delay == 0)
-                                        .Select(package => JsonSerializer.Serialize(package.Message))
+                                        .Select(package => JsonSerializer.Serialize(package.Message, JsonOptions))
                             );
                         }
-                        // In any case, message(s) will be deleted from the queue
+                        // Message(s) will be deleted from the queue
                         finally
                         {
                             // Suggestion, that everything is ok and we can delete the message(s) from the queue
@@ -192,9 +195,10 @@ namespace RabbitMq.Client.Wrapper
         private async Task Handle(Exception exception, IEnumerable<(T Message, ulong Delay)> packages)
         {
             // Publish retry
-            foreach (var (Message, Delay) in packages)
+            foreach (var (message, delay) in packages)
             {
-                await Retry.Publish(Message, Delay);
+                await Retry.Publish(message, delay);
+                OnWarning(exception, message);
             }
         }
 
@@ -206,23 +210,33 @@ namespace RabbitMq.Client.Wrapper
         /// <returns></returns>
         private async Task Handle(Exception exception, IEnumerable<string> messages)
         {
-            // Publish dead
-            await Dead.Publish(messages.Select(message => new RabbitDeadMessage
+            if (messages.Count() > 0)
             {
-                ExceptionType = exception.GetType().ToString(),
-                Exception = exception.Message,
-                MessageType = typeof(T).ToString(),
-                Message = message
-            }));
+                if (Dead == null)
+                {
+                    Dead = new DeadPublisher(Configuration.DeadQueueConfiguration);
+                }
+                // Publish dead
+                foreach (var message in messages)
+                {
+                    await Dead.Publish(new RabbitDeadMessage
+                    {
+                        ExceptionType = exception.GetType().ToString(),
+                        Exception = exception.Message,
+                        MessageType = typeof(T).ToString(),
+                        Message = message
+                    });
+                    OnException(exception, message);
+                }
+            }
         }
 
         /// <summary>
         /// Handle single message
         /// </summary>
         /// <param name="message">Message</param>
-        /// <param name="consumer">Consumer name</param>
         /// <returns>Task</returns>
-        public virtual async Task Handle(T message, string consumer)
+        protected virtual async Task Handle(T message)
         {
             // This should be overriden
             await Task.Run(() =>
@@ -235,9 +249,8 @@ namespace RabbitMq.Client.Wrapper
         /// Handle batch messages
         /// </summary>
         /// <param name="messages">Messages</param>
-        /// <param name="consumer">Consumer name</param>
         /// <returns>Task</returns>
-        public virtual async Task Handle(IEnumerable<T> messages, string consumer)
+        protected virtual async Task Handle(IEnumerable<T> messages)
         {
             // This should be overriden
             await Task.Run(() =>
@@ -248,24 +261,52 @@ namespace RabbitMq.Client.Wrapper
 
         #endregion
 
+        #region Logs
 
-
-
-
-
-
-
-
-
-        public virtual void OnStart(string consumer)
+        /// <summary>
+        /// On start event log
+        /// </summary>
+        /// <param name="index">The consumer index</param>
+        private void OnStart(short index)
         {
-            //Configuration
-            //var name = Configuration.Queue
-            Console.WriteLine("starting rabbit channel " + consumer);
+            // ...
+            Log(LogLevel.Information, RabbitAnnotations.Information.ConsumerStart, Configuration.Name + "[" + index + "]");
         }
 
+        /// <summary>
+        /// On handled event log
+        /// </summary>
+        /// <param name="milliseconds">Handle time in milliseconds</param>
+        /// <param name="count">Handled messages</param>
+        internal virtual void OnHandled(double milliseconds, int count)
+        {
+            // ...
+            Log(LogLevel.Information, RabbitAnnotations.Information.ConsumerHandled, Configuration.Name, count, milliseconds);
+        }
 
+        /// <summary>
+        /// On warning event log
+        /// </summary>
+        /// <param name="exception">Exception</param>
+        /// <param name="messages">Failed message</param>
+        internal virtual void OnWarning(Exception exception, T message)
+        {
+            // ...
+            Log(LogLevel.Warning, RabbitAnnotations.Exception.HandlerWarning, Configuration.Name, exception, message);
+        }
 
+        /// <summary>
+        /// On exception event log
+        /// </summary>
+        /// <param name="exception">Exception</param>
+        /// <param name="message">Failed message</param>
+        internal virtual void OnException(Exception exception, object message)
+        {
+            // ...
+            Log(LogLevel.Error, RabbitAnnotations.Exception.HandlerException, Configuration.Name, exception, message);
+        }
+
+        #endregion
 
     }
 

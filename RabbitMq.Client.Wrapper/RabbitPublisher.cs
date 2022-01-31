@@ -5,16 +5,15 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
 
-namespace RabbitMq.Client.Wrapper
+namespace RabbitMQ.Client.Wrapper
 {
 
     /// <summary>
     /// Represents message publish functionality
     /// </summary>
     /// <typeparam name="T">Type of the message</typeparam>
-    public abstract class RabbitPublisher<T> : RabbitBase
+    public class RabbitPublisher<T> : RabbitBase
     {
 
         #region Constructor
@@ -38,6 +37,8 @@ namespace RabbitMq.Client.Wrapper
             Destination = Configuration.Exchange ? Configuration.Name : string.Empty;
             // Defining the dafault road
             DefaultRoute = Configuration.Routings.Count > 1 ? string.Empty : Configuration.Routings.First();
+            // On start event
+            OnStart();
         }
 
         #endregion
@@ -47,7 +48,7 @@ namespace RabbitMq.Client.Wrapper
         /// <summary>
         /// Configuration
         /// </summary>
-        public RabbitPublisherConfiguration Configuration { get; set; }
+        private RabbitPublisherConfiguration Configuration { get; set; }
 
         /// <summary>
         /// Publish properties
@@ -110,13 +111,12 @@ namespace RabbitMq.Client.Wrapper
 
         #endregion
 
-        #region Publish functionality
+        #region Publish
 
         /// <summary>
-        /// 
+        /// Publish
         /// </summary>
-        /// <param name="messages"></param>
-        /// <returns></returns>
+        /// <param name="messages">Messages</param>
         public async Task Publish(IEnumerable<T> messages)
         {
             // Publishing ...
@@ -124,28 +124,29 @@ namespace RabbitMq.Client.Wrapper
         }
 
         /// <summary>
-        /// 
+        /// Publish
         /// </summary>
-        /// <param name="messages"></param>
-        /// <param name="route"></param>
-        /// <returns></returns>
+        /// <param name="messages">Messages</param>
+        /// <param name="route">Route</param>
         public async Task Publish(IEnumerable<T> messages, string route)
         {
             // Publishing ...
             if (messages != null)
             {
+                // Publish beggin time
+                var stamp = DateTime.Now;
                 foreach (var message in messages)
                 {
-                    await Publish(message, route);
+                    await Publish(message, route, false);
                 }
+                OnPublished((DateTime.Now - stamp).TotalMilliseconds, messages.Count());
             }
         }
 
         /// <summary>
-        /// 
+        /// Publish
         /// </summary>
-        /// <param name="message"></param>
-        /// <returns></returns>
+        /// <param name="message">Message</param>
         public async Task Publish(T message)
         {
             // Publishing ...
@@ -153,23 +154,39 @@ namespace RabbitMq.Client.Wrapper
         }
 
         /// <summary>
-        /// 
+        /// Publish
         /// </summary>
-        /// <param name="message"></param>
-        /// <param name="route"></param>
-        /// <returns></returns>
+        /// <param name="message">Message</param>
+        /// <param name="route">Route</param>
         public async Task Publish(T message, string route)
         {
             // Publishing ...
-            await Publish(message, route, null);
+            await Publish(message, route, true);
         }
 
         /// <summary>
-        /// 
+        /// Publish
         /// </summary>
-        /// <param name="message"></param>
-        /// <param name="delay"></param>
-        /// <returns></returns>
+        /// <param name="message">Message</param>
+        /// <param name="route">Route</param>
+        /// <param name="single">Single message</param>
+        private async Task Publish(T message, string route, bool single)
+        {
+            // Publish beggin time
+            var stamp = DateTime.Now;
+            // Publishing ...
+            await Publish(message, route, null);
+            if (single)
+            {
+                OnPublished((DateTime.Now - stamp).TotalMilliseconds, 1);
+            }
+        }
+
+        /// <summary>
+        /// Publish
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="delay">Delay milliseconds</param>
         internal async Task Publish(T message, ulong delay)
         {
             // Publishing ...
@@ -181,12 +198,11 @@ namespace RabbitMq.Client.Wrapper
         }
 
         /// <summary>
-        /// 
+        /// Publish
         /// </summary>
-        /// <param name="message"></param>
-        /// <param name="route"></param>
-        /// <param name="headers"></param>
-        /// <returns></returns>
+        /// <param name="message">Message</param>
+        /// <param name="route">Route</param>
+        /// <param name="headers">Publish headers</param>
         private async Task Publish(T message, string route, Dictionary<string, object> headers = null)
         {
             // Transforming T message to string
@@ -196,12 +212,12 @@ namespace RabbitMq.Client.Wrapper
                 // Validations
                 if (!ValidateRoute(route))
                 {
-                    throw new ArgumentException(string.Format(RabbitAnnotations.Publish_NotImplementedException, route), "route");
+                    throw new ArgumentException(string.Format(RabbitAnnotations.Exception.PublishNotImplementedException, route), "route");
                 }
                 // Preparing publish headers
                 PublishProperties.Headers = PublishHeaders(headers);
                 // Json representation of the message
-                messageString = JsonSerializer.Serialize(message);
+                messageString = JsonSerializer.Serialize(message, JsonOptions);
                 // Performing message publish
                 await Task.Run(() =>
                 {
@@ -212,21 +228,48 @@ namespace RabbitMq.Client.Wrapper
                        basicProperties: PublishProperties,
                        body: Encoding.UTF8.GetBytes(messageString)
                     );
-                    // The message is published...
-                    //OnPublish(messageString);
                 });
             }
             catch (Exception exception)
             {
-                Console.WriteLine(exception.Message);
-                // An exception has happened
-                //OnException(exception, messageString);
-                // Rethrow ...
-                //throw new Exception(
-                //    string.Format("unable to publish publisher {0} for ??? message {1}", Configuration.Name, messageString),
-                //    exception
-                //);
+                OnException(exception, message);
             }
+        }
+
+        #endregion
+
+        #region Logs
+
+        /// <summary>
+        /// On start event log
+        /// </summary>
+        private void OnStart()
+        {
+            // ...
+            Log(LogLevel.Information, RabbitAnnotations.Information.PublisherStart, Configuration.Name);
+        }
+
+        /// <summary>
+        /// On published event log
+        /// </summary>
+        /// <param name="milliseconds">Publish time in milliseconds</param>
+        /// <param name="count">Published messages</param>
+        internal virtual void OnPublished(double milliseconds, int count)
+        {
+            // ...
+            Log(LogLevel.Information, RabbitAnnotations.Information.PublisherPublished, Configuration.Name, count, milliseconds);
+        }
+
+        /// <summary>
+        /// On exception event log
+        /// </summary>
+        /// <param name="exception">Exception</param>
+        /// <param name="message">Failed message</param>
+        internal virtual void OnException(Exception exception, T message)
+        {
+            // ...
+            Log(LogLevel.Error, RabbitAnnotations.Exception.PublishException, Configuration.Name, exception, message);
+            throw exception;
         }
 
         #endregion

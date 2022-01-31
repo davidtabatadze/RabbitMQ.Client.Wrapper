@@ -1,10 +1,9 @@
 ﻿using System.Linq;
 using System.Timers;
 using System.Collections.Generic;
-using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
-namespace RabbitMq.Client.Wrapper
+namespace RabbitMQ.Client.Wrapper
 {
 
     /// <summary>
@@ -18,17 +17,14 @@ namespace RabbitMq.Client.Wrapper
         /// Constructor
         /// </summary>
         /// <param name="channel">Common AMPQ model</param>
-        /// <param name="name">Name of the consumer</param>
         /// <param name="batch">Grouping size for packages</param>
-        internal RabbitConsumerBase(IModel channel, string name, ushort batch) : base(channel)
+        internal RabbitConsumerBase(IModel channel, ushort batch) : base(channel)
         {
             // Setting batch size
             BatchSize = batch;
-            Name = name;
             // When time is up...
             Timer.Elapsed += (sender, eventArgs) =>
             {
-                System.Console.WriteLine("tick " + name);
                 // We do discharge the packages(s)
                 if (Packages.Count > 0)
                 {
@@ -43,7 +39,7 @@ namespace RabbitMq.Client.Wrapper
         /// <param name="packages">Accumulated packages</param>
         /// <param name="tag">Last tag of package</param>
         /// <param name="name">Consumer worker name</param>
-        internal protected delegate void HandleEvent(List<(T Message, ulong Delay)> packages, ulong tag, string name);
+        internal protected delegate void HandleEvent(List<(T Message, ulong Delay)> packages, ulong tag);
 
         /// <summary>
         /// Event for hendling the package(s)
@@ -71,11 +67,6 @@ namespace RabbitMq.Client.Wrapper
         private ulong LastTag { get; set; }
 
         /// <summary>
-        /// Consumer name
-        /// </summary>
-        private string Name { get; set; }
-
-        /// <summary>
         /// Discharge the package(s)
         /// </summary>
         private void Discharge()
@@ -83,7 +74,7 @@ namespace RabbitMq.Client.Wrapper
             // Handle the package(s)
             var packages = Packages.Select(i => i).ToList();
             Packages = new List<(T, ulong)> { };
-            Handle?.Invoke(packages, LastTag, Name);
+            Handle?.Invoke(packages, LastTag);
         }
 
         /// <summary>

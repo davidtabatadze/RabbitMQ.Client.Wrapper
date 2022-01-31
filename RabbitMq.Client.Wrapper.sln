@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.757
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31424.327
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RabbitMq.Client.Wrapper.Test", "RabbitMq.Client.Wrapper.Test\RabbitMq.Client.Wrapper.Test.csproj", "{83880953-6438-430C-8E62-CB0CC7BF5BE0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RabbitMQ.Client.Wrapper.Test", "RabbitMq.Client.Wrapper.Test\RabbitMQ.Client.Wrapper.Test.csproj", "{83880953-6438-430C-8E62-CB0CC7BF5BE0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RabbitMq.Client.Wrapper", "RabbitMq.Client.Wrapper\RabbitMq.Client.Wrapper.csproj", "{AC359A8F-3699-4151-96EB-4CE9E4CA2DAC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RabbitMQ.Client.Wrapper", "RabbitMq.Client.Wrapper\RabbitMQ.Client.Wrapper.csproj", "{AC359A8F-3699-4151-96EB-4CE9E4CA2DAC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

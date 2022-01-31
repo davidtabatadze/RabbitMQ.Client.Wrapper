@@ -1,6 +1,6 @@
 ﻿
 
-namespace RabbitMq.Client.Wrapper
+namespace RabbitMQ.Client.Wrapper
 {
 
     /// <summary>

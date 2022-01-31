@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Encodings.Web;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
 
-namespace RabbitMq.Client.Wrapper
+namespace RabbitMQ.Client.Wrapper
 {
 
     /// <summary>
@@ -16,25 +18,33 @@ namespace RabbitMq.Client.Wrapper
         #region Dispose
 
         /// <summary>
-        /// კლასის სიცოცხლის ციკლის დასრულება
+        /// Dispose
         /// </summary>
         public void Dispose()
         {
-            //
+            // Dispose of unmanaged resources.
             Dispose(true);
+            // Suppress finalization.
             GC.SuppressFinalize(this);
         }
 
         /// <summary>
-        /// კლასის სიცოცხლის ციკლის დასრულება
+        /// Dispose
         /// </summary>
-        /// <param name="disposing">ციკლის დასრულების მნიშვნელობა</param>
+        /// <param name="disposing">We are disposing or not</param>
         protected virtual void Dispose(bool disposing)
         {
-            // თუკი ციკლი სრულდება
+            // If disposing
             if (disposing)
             {
                 // ...
+                Logger = null;
+                Arguments = null;
+                foreach (var channel in Channels)
+                {
+                    channel.Dispose();
+                }
+                Channels = null;
             }
         }
 
@@ -56,6 +66,16 @@ namespace RabbitMq.Client.Wrapper
         /// No exchange/queue is auto deletable
         /// </summary>
         private const bool Deletable = false;
+
+        /// <summary>
+        /// Json options
+        /// </summary>
+        protected readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            //DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault
+        };
 
         #endregion
 
@@ -106,7 +126,7 @@ namespace RabbitMq.Client.Wrapper
                           string.Empty;
             if (!string.IsNullOrWhiteSpace(invalid))
             {
-                throw new ArgumentException(RabbitAnnotations.Factory_ArgumentException_General, invalid);
+                throw new ArgumentException(RabbitAnnotations.Exception.FactoryArgumentExceptionGeneral, invalid);
             }
         }
 
@@ -119,21 +139,21 @@ namespace RabbitMq.Client.Wrapper
             this((RabbitConfigurationBase)configuration, logger)
         {
             // Fixings
-            if (configuration.Type == ExchangeType.Fanout || configuration.Routings == null)
+            if (configuration.Routings == null)
             {
                 configuration.Routings = new List<string> { configuration.Name };
             }
-            configuration.Routings = configuration.Routings.Where(route => !string.IsNullOrWhiteSpace(route)).ToList();
+            configuration.Routings = configuration.Routings?.Where(route => !string.IsNullOrWhiteSpace(route)).ToList();
             // Validations
+            if (configuration.Routings.Count == 0)
+            {
+                throw new ArgumentException(RabbitAnnotations.Exception.FactoryArgumentExceptionPublisher, "Routings");
+            }
             if (configuration.Exchange)
             {
                 if (!new List<string> { "x-delayed-message", "topic", "direct", "fanout" }.Contains(configuration.Type))
                 {
-                    throw new NotImplementedException(string.Format(RabbitAnnotations.Factory_NotImplementedException, configuration.Type));
-                }
-                if (configuration.Routings.Count == 0)
-                {
-                    throw new Exception("routings...");
+                    throw new NotImplementedException(string.Format(RabbitAnnotations.Exception.FactoryNotImplementedExceptionPublisher, configuration.Type));
                 }
             }
             // Declaring channel
@@ -165,14 +185,13 @@ namespace RabbitMq.Client.Wrapper
             configuration.BatchSize = configuration.BatchSize < 1 ? (ushort)1 : configuration.BatchSize;
             configuration.Bindings ??= new Dictionary<string, string> { };
             configuration.RetryIntervals ??= new List<ulong> { };
-            configuration.RetryIntervals.Add(1111); // D.T. trick
+            //configuration.RetryIntervals.Add(5000); // D.T. trick
             configuration.RetryIntervals = configuration.RetryIntervals
-                                                        .Where(interval => interval == 1111 || interval > 5000)
+                                                        .Where(interval => interval >= 5000)
                                                         .OrderBy(interval => interval)
                                                         .ToList();
             // Preparations
             var retry = configuration.RetryExchangeConfiguration;
-            var dead = configuration.DeadQueueConfiguration;
             configuration.Bindings.Add(configuration.Name, retry.Name);
             // Declarations
             for (int i = 1; i <= configuration.Workers; i++)
@@ -181,8 +200,6 @@ namespace RabbitMq.Client.Wrapper
                 var channel = DeclareChannel(configuration);
                 // Declaring paired retry exchange
                 DeclareExchange(channel, retry.Name, retry.Type, retry.Arguments);
-                // Declaring paired dead message queue
-                DeclareQueue(channel, dead.Name, null);
                 // Declaring queue and bindings
                 DeclareQueue(channel, configuration.Name, configuration.Bindings);
                 // Registering channel
@@ -239,7 +256,7 @@ namespace RabbitMq.Client.Wrapper
         /// <param name="channel">Current channel</param>
         /// <param name="exchange">Exchange name</param>
         /// <param name="type">Exchange type</param>
-        /// <param name="arguments">Exchange arguments</param>
+        /// <param name="arguments">Channel arguments</param>
         private void DeclareExchange(IModel channel, string exchange, string type, Dictionary<string, object> arguments)
         {
             // Declaring exchange
@@ -279,6 +296,26 @@ namespace RabbitMq.Client.Wrapper
                         routingKey: binding.Key
                     );
                 }
+            }
+        }
+
+        #endregion
+
+        #region Logging
+
+        /// <summary>
+        /// Logging
+        /// </summary>
+        /// <param name="level">Level</param>
+        /// <param name="message">Message</param>
+        /// <param name="args">Arguments</param>
+        internal protected void Log(LogLevel level, string message, params object[] args)
+        {
+            // If logger exists
+            if (Logger != null)
+            {
+                // We do log
+                Logger.Log(level, message, args);
             }
         }
 
