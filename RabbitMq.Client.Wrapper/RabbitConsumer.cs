@@ -17,6 +17,28 @@ namespace RabbitMQ.Client.Wrapper
     public class RabbitConsumer<T> : RabbitBase
     {
 
+        #region Dispose
+
+        /// <summary>
+        /// Dispose
+        /// </summary>
+        /// <param name="disposing">We are disposing or not</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (Disposed)
+            {
+                return;
+            }
+            if (disposing)
+            {
+                Configuration = null;
+                Retry.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #endregion
+
         #region Helpers
 
         /// <summary>
@@ -60,11 +82,6 @@ namespace RabbitMQ.Client.Wrapper
         /// Retry publisher
         /// </summary>
         private RetryPublisher Retry { get; set; }
-
-        /// <summary>
-        /// Dead publisher
-        /// </summary>
-        private DeadPublisher Dead { get; set; }
 
 
         #endregion
@@ -212,21 +229,20 @@ namespace RabbitMQ.Client.Wrapper
         {
             if (messages.Count() > 0)
             {
-                if (Dead == null)
+                using (var dead = new DeadPublisher(Configuration.DeadQueueConfiguration))
                 {
-                    Dead = new DeadPublisher(Configuration.DeadQueueConfiguration);
-                }
-                // Publish dead
-                foreach (var message in messages)
-                {
-                    await Dead.Publish(new RabbitDeadMessage
+                    // Publish dead
+                    foreach (var message in messages)
                     {
-                        ExceptionType = exception.GetType().ToString(),
-                        Exception = exception.Message,
-                        MessageType = typeof(T).ToString(),
-                        Message = message
-                    });
-                    OnException(exception, message);
+                        await dead.Publish(new RabbitDeadMessage
+                        {
+                            ExceptionType = exception.GetType().ToString(),
+                            Exception = exception.Message,
+                            MessageType = typeof(T).ToString(),
+                            Message = message
+                        });
+                        OnException(exception, message);
+                    }
                 }
             }
         }
@@ -270,7 +286,7 @@ namespace RabbitMQ.Client.Wrapper
         private void OnStart(short index)
         {
             // ...
-            Log(LogLevel.Information, RabbitAnnotations.Information.ConsumerStart, Configuration.Name + "[" + index + "]");
+            Log(LogLevel.Debug, RabbitAnnotations.Information.ConsumerStart, Configuration.Name + "[" + index + "]");
         }
 
         /// <summary>
@@ -281,7 +297,7 @@ namespace RabbitMQ.Client.Wrapper
         internal virtual void OnHandled(double milliseconds, int count)
         {
             // ...
-            Log(LogLevel.Information, RabbitAnnotations.Information.ConsumerHandled, Configuration.Name, count, milliseconds);
+            Log(LogLevel.Debug, RabbitAnnotations.Information.ConsumerHandled, Configuration.Name, count, milliseconds);
         }
 
         /// <summary>

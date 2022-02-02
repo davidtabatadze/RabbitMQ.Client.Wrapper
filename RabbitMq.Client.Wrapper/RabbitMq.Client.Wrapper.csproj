@@ -16,7 +16,7 @@ Rabbit consumer</PackageReleaseNotes>
     <NeutralLanguage>ka-GE</NeutralLanguage>
     <PackageId>RabbitMQ.Client.Wrapper</PackageId>
     <Product>RabbitMQ.Client.Wrapper</Product>
-    <Version>1.1.0</Version>
+    <Version>1.1.2</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -16,6 +16,28 @@ namespace RabbitMQ.Client.Wrapper
     public class RabbitPublisher<T> : RabbitBase
     {
 
+        #region Dispose
+
+        /// <summary>
+        /// Dispose
+        /// </summary>
+        /// <param name="disposing">We are disposing or not</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (Disposed)
+            {
+                return;
+            }
+            if (disposing)
+            {
+                Configuration = null;
+                PublishProperties = null;
+            }
+            base.Dispose(disposing);
+        }
+
+        #endregion
+
         #region Constructor
 
         /// <summary>
@@ -246,7 +268,7 @@ namespace RabbitMQ.Client.Wrapper
         private void OnStart()
         {
             // ...
-            Log(LogLevel.Information, RabbitAnnotations.Information.PublisherStart, Configuration.Name);
+            Log(LogLevel.Debug, RabbitAnnotations.Information.PublisherStart, Configuration.Name);
         }
 
         /// <summary>
@@ -257,7 +279,7 @@ namespace RabbitMQ.Client.Wrapper
         internal virtual void OnPublished(double milliseconds, int count)
         {
             // ...
-            Log(LogLevel.Information, RabbitAnnotations.Information.PublisherPublished, Configuration.Name, count, milliseconds);
+            Log(LogLevel.Debug, RabbitAnnotations.Information.PublisherPublished, Configuration.Name, count, milliseconds);
         }
 
         /// <summary>

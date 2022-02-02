@@ -34,6 +34,10 @@ namespace RabbitMQ.Client.Wrapper
         /// <param name="disposing">We are disposing or not</param>
         protected virtual void Dispose(bool disposing)
         {
+            if (Disposed)
+            {
+                return;
+            }
             // If disposing
             if (disposing)
             {
@@ -46,6 +50,7 @@ namespace RabbitMQ.Client.Wrapper
                 }
                 Channels = null;
             }
+            Disposed = true;
         }
 
         #endregion
@@ -80,6 +85,11 @@ namespace RabbitMQ.Client.Wrapper
         #endregion
 
         #region Properties
+
+        /// <summary>
+        /// Either disposed or not
+        /// </summary>
+        protected bool Disposed { get; set; } = false;
 
         /// <summary>
         /// Logger

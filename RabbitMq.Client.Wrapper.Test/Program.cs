@@ -95,7 +95,7 @@ namespace RabbitMQ.Client.Wrapper.Test
             {
                 Hosts = new List<string> { "localhost" },
                 Name = "simple-queue",
-                //RetryIntervals = new List<ulong> { 30000, 60000 },
+                RetryIntervals = new List<ulong> { 60000 },
                 BatchSize = 100
             }, loggerFactory);
 
