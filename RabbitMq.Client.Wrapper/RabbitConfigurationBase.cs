@@ -6,7 +6,7 @@ namespace RabbitMQ.Client.Wrapper
     /// <summary>
     /// Represents RabbitMQ configuration basis
     /// </summary>
-    public abstract class RabbitConfigurationBase
+    public class RabbitConfigurationBase
     {
         /// <summary>
         /// The hosts to connect to

@@ -268,7 +268,7 @@ namespace RabbitMQ.Client.Wrapper
         private void OnStart()
         {
             // ...
-            Log(LogLevel.Debug, RabbitAnnotations.Information.PublisherStart, Configuration.Name);
+            Log(LogLevel.Trace, RabbitAnnotations.Information.PublisherStart, Configuration.Name);
         }
 
         /// <summary>
