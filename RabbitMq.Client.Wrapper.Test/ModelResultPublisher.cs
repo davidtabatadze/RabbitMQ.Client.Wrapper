@@ -4,7 +4,7 @@ using System.Text;
 
 namespace RabbitMQ.Client.Wrapper.Test
 {
-    class ModelResultPublisher : RabbitPublisher<Model>
+    public class ModelResultPublisher : RabbitPublisher<Model>
     {
         public ModelResultPublisher(RabbitPublisherConfiguration configuration)
             : base(configuration) { }

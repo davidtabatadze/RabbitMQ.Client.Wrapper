@@ -30,6 +30,8 @@ namespace RabbitMQ.Client.Wrapper
             }
             if (disposing)
             {
+                Log(LogLevel.Trace, RabbitAnnotations.Information.PublisherDispose, Configuration.Name);
+                Routes = null;
                 Configuration = null;
                 PublishProperties = null;
             }
@@ -43,9 +45,32 @@ namespace RabbitMQ.Client.Wrapper
         /// <summary>
         /// Constructor
         /// </summary>
+        /// <param name="configuration">Base configuration</param>
+        /// <param name="logger">Logger</param>
+        /// <param name="name">Name of the exchange/queue</param>
+        /// <param name="type">Type of the publisher exchange</param>
+        /// <param name="headers">Publish headers</param>
+        /// <param name="dependencies">Dependencies <see cref="RabbitConfigurationDependency"/></param>   
+        public RabbitPublisher(
+            RabbitConfigurationBase configuration,
+            ILogger logger = null,
+            string name = null,
+            string type = null,
+            Dictionary<string, object> headers = null,
+            List<RabbitConfigurationDependency> dependencies = null
+        ) : this(
+            RabbitConfigurationBase.ToPublisherConfiguration(configuration, name, type, headers, dependencies),
+            logger
+        )
+        { }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
         /// <param name="configuration">Configuration</param>
         /// <param name="logger">Logger</param>
-        public RabbitPublisher(RabbitPublisherConfiguration configuration, ILogger logger = null) : base(configuration, logger)
+        public RabbitPublisher(RabbitPublisherConfiguration configuration, ILogger logger = null)
+            : base(configuration, logger)
         {
             // ...
             Configuration = configuration;
@@ -57,8 +82,16 @@ namespace RabbitMQ.Client.Wrapper
             PublishProperties.Persistent = true;
             // Defining the destination
             Destination = Configuration.Exchange ? Configuration.Name : string.Empty;
-            // Defining the dafault road
-            DefaultRoute = Configuration.Routings.Count > 1 ? string.Empty : Configuration.Routings.First();
+            // Defining the routes
+            Routes = configuration.Dependencies
+                                  .Select(dependency => dependency.Route)
+                                  .Where(route => !string.IsNullOrWhiteSpace(route))
+                                  .ToList();
+            if (Routes.Count == 0)
+            {
+                Routes.Add(configuration.Name);
+            }
+            DefaultRoute = Routes.Count == 1 ? Routes[0] : string.Empty;
             // On start event
             OnStart();
         }
@@ -71,6 +104,11 @@ namespace RabbitMQ.Client.Wrapper
         /// Configuration
         /// </summary>
         private RabbitPublisherConfiguration Configuration { get; set; }
+
+        /// <summary>
+        /// Routing / Binding keys
+        /// </summary>
+        public List<string> Routes { get; set; }
 
         /// <summary>
         /// Publish properties
@@ -98,7 +136,7 @@ namespace RabbitMQ.Client.Wrapper
         /// <returns>Valid / Not valid</returns>
         private bool ValidateRoute(string route)
         {
-            return Configuration.Exchange == false || Configuration.Fanout || Configuration.Routings.Contains(route);
+            return Configuration.Exchange == false || Configuration.Fanout || Routes.Contains(route);
         }
 
         /// <summary>

@@ -10,11 +10,6 @@ namespace RabbitMQ.Client.Wrapper
     {
 
         /// <summary>
-        /// Pair of routing key - exchange name
-        /// </summary>
-        public Dictionary<string, string> Bindings { get; set; }
-
-        /// <summary>
         /// Retry intervals in milliseconds
         /// </summary>
         /// <remarks>

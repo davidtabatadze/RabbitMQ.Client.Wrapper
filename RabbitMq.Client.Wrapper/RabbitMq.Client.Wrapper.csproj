@@ -5,7 +5,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Authors>David Tabatadze</Authors>
     <Company>David Tabatadze</Company>
-    <Copyright>Copyright (c) 2020 David Tabatadze</Copyright>
+    <Copyright>Copyright (c) 2022 David Tabatadze</Copyright>
     <PackageTags>.net standard netstandard wrapper rabbit rabbitmq david tabatadze optio optioai optio.ai</PackageTags>
     <PackageReleaseNotes>Rabbit publisher
 Rabbit consumer</PackageReleaseNotes>
@@ -16,7 +16,7 @@ Rabbit consumer</PackageReleaseNotes>
     <NeutralLanguage>ka-GE</NeutralLanguage>
     <PackageId>RabbitMQ.Client.Wrapper</PackageId>
     <Product>RabbitMQ.Client.Wrapper</Product>
-    <Version>1.1.3</Version>
+    <Version>2.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

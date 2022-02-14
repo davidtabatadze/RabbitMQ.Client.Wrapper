@@ -18,15 +18,6 @@ namespace RabbitMQ.Client.Wrapper
         public string Type { get; set; }
 
         /// <summary>
-        /// Routing / Binding keys
-        /// </summary>
-        /// <remarks>
-        /// If the 'Type' parameter is not present, this will be ignored.
-        /// Otherwise if this is empty or 'fanout', routing will be created with the same name as exchange
-        /// </remarks>
-        public List<string> Routings { get; set; }
-
-        /// <summary>
         /// Publish headers
         /// </summary>
         public Dictionary<string, object> Headers { get; set; }

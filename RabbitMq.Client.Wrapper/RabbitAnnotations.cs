@@ -41,8 +41,10 @@ namespace RabbitMQ.Client.Wrapper
         {
 
             public const string PublisherStart = "Starting RabbitMq publisher: {publisher}.";
+            public const string PublisherDispose = "Disposing RabbitMq publisher: {publisher}.";
             public const string PublisherPublished = "The publisher '{publisher}' has published {count} message(s) in {milliseconds} milliseconds.";
             public const string ConsumerStart = "Starting RabbitMq consumer: {consumer}.";
+            public const string ConsumerDispose = "Disposing RabbitMq consumer: {consumer}.";
             public const string ConsumerHandled = "The consumer '{consumer}' has handled {count} message(s) in {milliseconds} milliseconds.";
 
         }
@@ -54,8 +56,9 @@ namespace RabbitMQ.Client.Wrapper
         {
 
             public const string FactoryArgumentExceptionGeneral = "Unable to create RabbitMq factory: parameters not enought.";
-            public const string FactoryArgumentExceptionPublisher = "Unable to create RabbitMq publisher: parameters not enought.";
             public const string FactoryNotImplementedExceptionPublisher = "Unable to create RabbitMq publisher: exchange type '{0}' is not implemented, only 'topic', 'direct', 'fanout' and 'x-delayed-message' are allowed.";
+            public const string FactoryArgumentExceptionConsumer = "Unable to create RabbitMq consumer: parameters not enought.";
+            public const string FactoryNotImplementedExceptionConsumer = "Unable to create RabbitMq consumer: one of the dependency exchange type is not implemented, only 'topic', 'direct', 'fanout' and 'x-delayed-message' are allowed.";
             public const string PublishNotImplementedException = "Unable to publish RabbitMq message: route should be present. '{0}' is not a valid routing key.";
             public const string PublishException = "The publisher {publisher} has faild while publishing the message. exception: {@exception}. message: {@message}.";
             public const string HandlerException = "The consumer {consumer} has faild to handle the message. exception: {@exception}. message: {@message}.";

@@ -31,6 +31,7 @@ namespace RabbitMQ.Client.Wrapper
             }
             if (disposing)
             {
+                Log(LogLevel.Trace, RabbitAnnotations.Information.ConsumerDispose, Configuration.Name);
                 Configuration = null;
                 Retry.Dispose();
             }
@@ -91,9 +92,34 @@ namespace RabbitMQ.Client.Wrapper
         /// <summary>
         /// Constructor
         /// </summary>
+        /// <param name="configuration">Configuration base</param>
+        /// <param name="logger">Logger</param>
+        /// <param name="name">Name of the exchange/queue<</param>
+        /// <param name="workers">Consumer workers count</param>
+        /// <param name="batchSize">Grouping size for messages</param>
+        /// <param name="retryIntervals">Retry intervals in milliseconds</param>
+        /// <param name="dependencies">Dependencies <see cref="RabbitConfigurationDependency"/></param>
+        public RabbitConsumer(
+            RabbitConfigurationBase configuration,
+            ILogger logger = null,
+            string name = null,
+            ushort workers = 0,
+            ushort batchSize = 0,
+            List<ulong> retryIntervals = null,
+            List<RabbitConfigurationDependency> dependencies = null
+        ) : this(
+            RabbitConfigurationBase.ToConsumerConfiguration(configuration, name, workers, batchSize, retryIntervals, dependencies),
+            logger
+        )
+        { }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
         /// <param name="configuration">Configuration</param>
         /// <param name="logger">Logger</param>
-        public RabbitConsumer(RabbitConsumerConfiguration configuration, ILogger logger = null) : base(configuration, logger)
+        public RabbitConsumer(RabbitConsumerConfiguration configuration, ILogger logger = null)
+            : base(configuration, logger)
         {
             // ...
             Configuration = configuration;
@@ -143,7 +169,6 @@ namespace RabbitMQ.Client.Wrapper
                             // We do kill the message
                             await Handle(exception, new List<string> { body });
                             channel.BasicAck(package.DeliveryTag, false);
-                            // channel.BasicReject(package.DeliveryTag, false);
                         });
                     }
                 };

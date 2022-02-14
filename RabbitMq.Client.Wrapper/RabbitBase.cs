@@ -111,6 +111,11 @@ namespace RabbitMQ.Client.Wrapper
         /// </summary>
         private Dictionary<string, object> Arguments = new Dictionary<string, object> { };
 
+        /// <summary>
+        /// Allowed tyes for exchange
+        /// </summary>
+        private readonly List<string> AllowedExchangeTypes = new List<string> { "x-delayed-message", "topic", "direct", "fanout" };
+
         #endregion
 
         #region Constructors
@@ -129,6 +134,8 @@ namespace RabbitMQ.Client.Wrapper
             {
                 Arguments = configuration.Arguments;
             }
+            // Base fixings
+            configuration.Dependencies ??= new List<RabbitConfigurationDependency> { };
             // Base validations
             var invalid = configuration == null ? "Configuration" :
                           configuration.Hosts == null || configuration.Hosts.Count == 0 ? "Hosts" :
@@ -145,23 +152,13 @@ namespace RabbitMQ.Client.Wrapper
         /// </summary>
         /// <param name="configuration">Publisher configuration</param>
         /// <param name="logger">Logger</param>
-        internal RabbitBase(RabbitPublisherConfiguration configuration, ILogger logger = null) :
-            this((RabbitConfigurationBase)configuration, logger)
+        internal RabbitBase(RabbitPublisherConfiguration configuration, ILogger logger = null)
+            : this((RabbitConfigurationBase)configuration, logger)
         {
-            // Fixings
-            if (configuration.Routings == null)
-            {
-                configuration.Routings = new List<string> { configuration.Name };
-            }
-            configuration.Routings = configuration.Routings?.Where(route => !string.IsNullOrWhiteSpace(route)).ToList();
             // Validations
-            if (configuration.Routings.Count == 0)
-            {
-                throw new ArgumentException(RabbitAnnotations.Exception.FactoryArgumentExceptionPublisher, "Routings");
-            }
             if (configuration.Exchange)
             {
-                if (!new List<string> { "x-delayed-message", "topic", "direct", "fanout" }.Contains(configuration.Type))
+                if (!AllowedExchangeTypes.Contains(configuration.Type))
                 {
                     throw new NotImplementedException(string.Format(RabbitAnnotations.Exception.FactoryNotImplementedExceptionPublisher, configuration.Type));
                 }
@@ -172,6 +169,14 @@ namespace RabbitMQ.Client.Wrapper
             if (configuration.Exchange)
             {
                 DeclareExchange(channel, configuration.Name, configuration.Type, Arguments);
+                foreach (var dependency in configuration.Dependencies)
+                {
+                    if (string.IsNullOrWhiteSpace(dependency.Route) || string.IsNullOrWhiteSpace(dependency.Name))
+                    {
+                        continue;
+                    }
+                    DeclareQueue(channel, dependency.Name, new Dictionary<string, string> { { configuration.Name, dependency.Route } });
+                }
             }
             // Declaring queue
             else
@@ -187,31 +192,59 @@ namespace RabbitMQ.Client.Wrapper
         /// </summary>
         /// <param name="configuration">constructor configuration</param>
         /// <param name="logger">Logger</param>
-        internal RabbitBase(RabbitConsumerConfiguration configuration, ILogger logger = null) :
-            this((RabbitConfigurationBase)configuration, logger)
+        internal RabbitBase(RabbitConsumerConfiguration configuration, ILogger logger = null)
+           : this((RabbitConfigurationBase)configuration, logger)
         {
             // Fixings
             configuration.Workers = configuration.Workers < 1 ? (ushort)1 : configuration.Workers;
             configuration.BatchSize = configuration.BatchSize < 1 ? (ushort)1 : configuration.BatchSize;
-            configuration.Bindings ??= new Dictionary<string, string> { };
             configuration.RetryIntervals ??= new List<ulong> { };
-            //configuration.RetryIntervals.Add(5000); // D.T. trick
             configuration.RetryIntervals = configuration.RetryIntervals
                                                         .Where(interval => interval >= 5000)
                                                         .OrderBy(interval => interval)
                                                         .ToList();
+            // Validations
+            var invalid = configuration.Dependencies.Count == 0 ? string.Empty :
+                          configuration.Dependencies.Any(dependency => string.IsNullOrEmpty(dependency.Name)) ? "Name" :
+                          configuration.Dependencies.Any(dependency => string.IsNullOrEmpty(dependency.Type)) ? "Type" :
+                          string.Empty;
+            if (!string.IsNullOrWhiteSpace(invalid))
+            {
+                throw new ArgumentException(RabbitAnnotations.Exception.FactoryArgumentExceptionConsumer, "Dependecies." + invalid);
+            }
+            if (configuration.Dependencies.Any(dependency => !AllowedExchangeTypes.Contains(dependency.Type)))
+            {
+                throw new NotImplementedException(RabbitAnnotations.Exception.FactoryNotImplementedExceptionConsumer);
+            }
             // Preparations
             var retry = configuration.RetryExchangeConfiguration;
-            configuration.Bindings.Add(configuration.Name, retry.Name);
+            var exchanges = new List<RabbitPublisherConfiguration> { retry };
+            exchanges.AddRange(configuration.Dependencies.Select(dependency => new RabbitPublisherConfiguration
+            {
+                Name = dependency.Name,
+                Type = dependency.Type,
+                Arguments = dependency.Arguments
+            }));
+            var bindings = configuration.Dependencies
+                                        .Select(dependency => new RabbitConfigurationDependency
+                                        {
+                                            Name = dependency.Name,
+                                            Route = string.IsNullOrEmpty(dependency.Route) ? configuration.Name : dependency.Route
+                                        })
+                                        .ToDictionary(dependency => dependency.Name, dependency => dependency.Route);
+            bindings.Add(retry.Name, configuration.Name);
             // Declarations
             for (int i = 1; i <= configuration.Workers; i++)
             {
                 // Declaring channel
                 var channel = DeclareChannel(configuration);
-                // Declaring paired retry exchange
-                DeclareExchange(channel, retry.Name, retry.Type, retry.Arguments);
+                // Declaring paired exchanges
+                foreach (var exchange in exchanges)
+                {
+                    DeclareExchange(channel, exchange.Name, exchange.Type, exchange.Arguments);
+                }
                 // Declaring queue and bindings
-                DeclareQueue(channel, configuration.Name, configuration.Bindings);
+                DeclareQueue(channel, configuration.Name, bindings);
                 // Registering channel
                 Channels.Add(channel);
             }
@@ -284,7 +317,7 @@ namespace RabbitMQ.Client.Wrapper
         /// </summary>
         /// <param name="channel">Current channel</param>
         /// <param name="queue">Queue name</param>
-        /// <param name="bindings">Pair of routing - exchange</param>
+        /// <param name="bindings">Pair of exchange - route</param>
         private void DeclareQueue(IModel channel, string queue, Dictionary<string, string> bindings)
         {
             // Declaring queue
@@ -302,8 +335,8 @@ namespace RabbitMQ.Client.Wrapper
                 {
                     channel.QueueBind(
                         queue: queue,
-                        exchange: binding.Value,
-                        routingKey: binding.Key
+                        exchange: binding.Key,
+                        routingKey: binding.Value
                     );
                 }
             }

@@ -15,7 +15,7 @@ namespace RabbitMQ.Client.Wrapper.Test
                 builder
                     .AddFilter("Microsoft", LogLevel.Warning)
                     .AddFilter("System", LogLevel.Warning)
-                    .AddFilter("LoggingConsoleApp.Program", LogLevel.Debug)
+                    .AddFilter("LoggingConsoleApp.Program", LogLevel.Trace)
                     .AddConsole();
             });
             ILogger logger = loggerFactory.CreateLogger<Program>();
@@ -25,7 +25,7 @@ namespace RabbitMQ.Client.Wrapper.Test
                 Id = 99,
                 Name = "datiko",
                 Date = new DateTime(1988, 11, 11),
-                Throw = true
+                Throw = false
             };
             var messages = new List<Model>{
                 new Model {
@@ -85,158 +85,170 @@ namespace RabbitMQ.Client.Wrapper.Test
                 new Model {
                     Id = 9,
                     Name = "name9",
-                    Date = DateTime.Now
+                    Date = DateTime.Now,
+                    Throw = true
                 }
             };
             var no = "!!!No!!!";
             var ok = "OK";
+            var validations = false;
 
-            var consumer = new ModelConsumer(new RabbitConsumerConfiguration
+            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+            if (validations)
             {
-                Hosts = new List<string> { "localhost" },
-                Name = "simple-queue",
-                RetryIntervals = new List<ulong> { 60000 },
-                BatchSize = 100
-            }, loggerFactory);
-
-            #region Publisher
-
-            // no host
-            Console.Write("publisher - no host - ");
-            try
-            {
-                using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Name = "simple-queue" }, loggerFactory))
+                // no host
+                Console.Write("publisher - no host - ");
+                try
                 {
+                    using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Name = "simple-queue" }, loggerFactory))
+                    {
+                    }
+                    Console.Write(no);
                 }
-                Console.Write(no);
-            }
-            catch (Exception e)
-            {
-                Console.Write(ok);
-                Console.WriteLine(" (" + e.Message + ")");
-            }
-
-            // no name
-            Console.Write("publisher - no name - ");
-            try
-            {
-                using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" } }, loggerFactory))
+                catch (Exception e)
                 {
+                    Console.Write(ok);
+                    Console.WriteLine(" (" + e.Message + ")");
                 }
-                Console.Write(no);
-            }
-            catch (Exception e)
-            {
-                Console.Write(ok);
-                Console.WriteLine(" (" + e.Message + ")");
-            }
-
-            // no route
-            Console.Write("publisher - no route - ");
-            try
-            {
-                using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue", Routings = new List<string> { "  " } }, loggerFactory))
+                Console.Write("consumer - no host - ");
+                try
                 {
+                    using (var consumer = new ModelConsumer(new RabbitConsumerConfiguration { Name = "simple-queue" }, loggerFactory))
+                    {
+                    }
+                    Console.Write(no);
                 }
-                Console.Write(no);
-            }
-            catch (Exception e)
-            {
-                Console.Write(ok);
-                Console.WriteLine(" (" + e.Message + ")");
-            }
-
-            // no exchange
-            Console.Write("publisher - no exchange - ");
-            try
-            {
-                using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue", Type = "dodola" }, loggerFactory))
+                catch (Exception e)
                 {
+                    Console.Write(ok);
+                    Console.WriteLine(" (" + e.Message + ")");
                 }
-                Console.Write(no);
-            }
-            catch (Exception e)
-            {
-                Console.Write(ok);
-                Console.WriteLine(" (" + e.Message + ")");
-            }
 
-            // simple exchange
-            Console.WriteLine("\nsimple exchange");
-            using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-direct", Type = "direct" }, loggerFactory))
-            {
-                await publisher.Publish(message);
-            }
-
-            // simple queue
-            Console.WriteLine("\nsimple queue");
-            using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue" }, loggerFactory))
-            {
-                //await publisher.Publish(message);
-                //await publisher.Publish(message);
-                await publisher.Publish(messages);
-                //await publisher.Publish(messages9);
-            }
-
-
-
-            using (var publisher = new RabbitPublisher<string>(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue" }))
-            {
-                await publisher.Publish("dodolaaa");
-            }
-            Console.ReadKey(); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-            // simple queue no logs
-            Console.WriteLine("\nsimple queue no logs");
-            using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue" }))
-            {
-                await publisher.Publish(message);
-                Console.WriteLine("----- no logs");
-            }
-
-            // simple queue override logs
-            Console.WriteLine("\nsimple queue override logs");
-            using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue" }, loggerFactory, true))
-            {
-                await publisher.Publish(message);
-            }
-
-            // simple queue override logs
-            Console.WriteLine("\nsimple queue override logs");
-            using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue" }, loggerFactory, true, true))
-            {
-                await publisher.Publish(message);
-                Console.WriteLine("----- hidden logs");
-            }
-
-            // simple exchange false route
-            Console.WriteLine("\nsimple exchange false route");
-            try
-            {
-                // simple exchange false route
-                Console.WriteLine("\nsimple exchange false route");
-                using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-exchange", Type = "direct", Routings = new List<string> { "r1", "r2" } }, loggerFactory))
+                // no name
+                Console.Write("publisher - no name - ");
+                try
                 {
-                    await publisher.Publish(message);
+                    using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" } }, loggerFactory))
+                    {
+                    }
+                    Console.Write(no);
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-            }
-            try
-            {
-                using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-exchange", Type = "direct", Routings = new List<string> { "r1", "r2" } }, loggerFactory))
+                catch (Exception e)
                 {
-                    await publisher.Publish(messages, "some route");
+                    Console.Write(ok);
+                    Console.WriteLine(" (" + e.Message + ")");
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
+                Console.Write("consumer - no name - ");
+                try
+                {
+                    using (var consumer = new ModelConsumer(new RabbitConsumerConfiguration { Hosts = new List<string> { "localhost" } }, loggerFactory))
+                    {
+                    }
+                    Console.Write(no);
+                }
+                catch (Exception e)
+                {
+                    Console.Write(ok);
+                    Console.WriteLine(" (" + e.Message + ")");
+                }
+
+                // no exchange
+                Console.Write("publisher - no exchange - ");
+                try
+                {
+                    using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue", Type = "dodola" }, loggerFactory))
+                    {
+                    }
+                    Console.Write(no);
+                }
+                catch (Exception e)
+                {
+                    Console.Write(ok);
+                    Console.WriteLine(" (" + e.Message + ")");
+                }
+
+                // no dependencies
+                Console.Write("consumer - no dependencies - name -");
+                try
+                {
+                    using (var consumer = new ModelConsumer(new RabbitConsumerConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue", Dependencies = new List<RabbitConfigurationDependency> { new RabbitConfigurationDependency { Type = "type" } } }, loggerFactory))
+                    {
+                    }
+                    Console.Write(no);
+                }
+                catch (Exception e)
+                {
+                    Console.Write(ok);
+                    Console.WriteLine(" (" + e.Message + ")");
+                }
+                Console.Write("consumer - no dependencies - type -");
+                try
+                {
+                    using (var consumer = new ModelConsumer(new RabbitConsumerConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue", Dependencies = new List<RabbitConfigurationDependency> { new RabbitConfigurationDependency { Name = "name" } } }, loggerFactory))
+                    {
+                    }
+                    Console.Write(no);
+                }
+                catch (Exception e)
+                {
+                    Console.Write(ok);
+                    Console.WriteLine(" (" + e.Message + ")");
+                }
+                Console.Write("consumer - no dependencies - type -");
+                try
+                {
+                    using (var consumer = new ModelConsumer(new RabbitConsumerConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue", Dependencies = new List<RabbitConfigurationDependency> { new RabbitConfigurationDependency { Name = "name", Type = "type" } } }, loggerFactory))
+                    {
+                    }
+                    Console.Write(no);
+                }
+                catch (Exception e)
+                {
+                    Console.Write(ok);
+                    Console.WriteLine(" (" + e.Message + ")");
+                }
+                Console.WriteLine("Validations OK");
             }
 
-            #endregion
+            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+            //using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue" }))
+            //{
+            //    await publisher.Publish(messages);
+            //}
+
+            //var con = new ModelConsumer(new RabbitConsumerConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue", RetryIntervals = new List<ulong> { 10000, 20000 } }, loggerFactory, new ModelResultPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue-results" }));
+
+            //using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-fanout", Type = "fanout", Dependencies = new List<RabbitConfigurationDependency> { new RabbitConfigurationDependency { Route = "some-route", Name = "simple-fanout-queue" } } }))
+            //{
+            //    await publisher.Publish(message);
+            //    await publisher.Publish(message, "other-route");
+            //}
+
+            //using (var consumer = new ModelConsumer(new RabbitConsumerConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue-withex", Dependencies = new List<RabbitConfigurationDependency> { new RabbitConfigurationDependency { Name = "auto-exchange", Type = "fanout" } } }, loggerFactory))
+            //{
+
+            //}
+
+            //using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-direct", Type = "direct", Dependencies = new List<RabbitConfigurationDependency> { new RabbitConfigurationDependency { Route = "direct-1", Name = "simple-direct-queue1" }, new RabbitConfigurationDependency { Route = "direct-2", Name = "simple-direct-queue2" } } }))
+            //{
+            //    await publisher.Publish(message, "direct-1");
+            //    await publisher.Publish(message, "direct-2");
+            //    await publisher.Publish(message);
+            //}
+
+
+            //using (var publisher = new ModelPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "test-queue" }))
+            //{
+            //    for (int i = 0; i < 10; i++)
+            //    {
+            //        await publisher.Publish(messages9);
+            //    }
+            //    await publisher.Publish(message);
+            //}
+            //System.Threading.Thread.Sleep(10000);
+            //var con = new ModelConsumer(new RabbitConsumerConfiguration { Hosts = new List<string> { "localhost" }, Name = "test-queue", BatchSize = 3, RetryIntervals = new List<ulong> { 10000 } }, loggerFactory, new ModelResultPublisher(new RabbitPublisherConfiguration { Hosts = new List<string> { "localhost" }, Name = "simple-queue-results" }));
 
             Console.WriteLine();
             Console.WriteLine("all done");
