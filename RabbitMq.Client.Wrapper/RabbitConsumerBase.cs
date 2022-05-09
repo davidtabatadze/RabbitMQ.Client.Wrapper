@@ -23,7 +23,7 @@ namespace RabbitMQ.Client.Wrapper
             // Setting batch size
             BatchSize = batch;
             // When time is up...
-            Timer.Elapsed += (sender, eventArgs) =>
+            DischargeTimer.Elapsed += (sender, eventArgs) =>
             {
                 // We do discharge the packages(s)
                 if (Packages.Count > 0)
@@ -38,7 +38,6 @@ namespace RabbitMQ.Client.Wrapper
         /// </summary>
         /// <param name="packages">Accumulated packages</param>
         /// <param name="tag">Last tag of package</param>
-        /// <param name="name">Consumer worker name</param>
         internal protected delegate void HandleEvent(List<(T Message, ulong Delay)> packages, ulong tag);
 
         /// <summary>
@@ -49,7 +48,7 @@ namespace RabbitMQ.Client.Wrapper
         /// <summary>
         /// Time to discharge the accumulated packages. 60 seconds
         /// </summary>
-        private Timer Timer = new Timer(60 * 1000) { Enabled = true };
+        private Timer DischargeTimer = new Timer(60 * 1000) { Enabled = true };
 
         /// <summary>
         /// Accumulated packages

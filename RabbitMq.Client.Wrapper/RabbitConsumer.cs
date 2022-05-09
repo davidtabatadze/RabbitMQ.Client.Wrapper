@@ -35,7 +35,7 @@ namespace RabbitMQ.Client.Wrapper
                 Configuration = null;
                 Retry.Dispose();
             }
-            base.Dispose(disposing);
+            Dispose();
         }
 
         #endregion
@@ -84,6 +84,10 @@ namespace RabbitMQ.Client.Wrapper
         /// </summary>
         private RetryPublisher Retry { get; set; }
 
+        /// <summary>
+        /// Consumer workers
+        /// </summary>
+        private readonly List<IBasicConsumer> Consumers = new List<IBasicConsumer> { };
 
         #endregion
 
@@ -134,10 +138,6 @@ namespace RabbitMQ.Client.Wrapper
                 OnStart(i);
                 // The consumer will not recive messages, until current is not handled
                 channel.BasicQos(0, Configuration.BatchSize, false);
-                // Binding queue to the consumer
-                // Message(s) will not be deleted automatically
-                // The consumer will wait acknowledgement to do so
-                channel.BasicConsume(Configuration.Name, false, consumer);
                 // Action for recieve message(s)
                 consumer.Received += (sender, package) =>
                 {
@@ -221,7 +221,32 @@ namespace RabbitMQ.Client.Wrapper
                         }
                     });
                 };
+                // Recording consumer workers
+                Consumers.Add(consumer);
             }
+        }
+
+        #endregion
+
+        #region Functinalities
+
+        /// <summary>
+        /// Do start actual consuming
+        /// </summary>
+        /// <returns>Rabbit consumer</returns>
+        public RabbitConsumer<T> StartConsuming()
+        {
+            // For each channel...
+            for (int i = 0; i < Channels.Count; i++)
+            {
+                // Binding workers
+                // Message(s) will not be deleted automatically
+                // The consumer will wait acknowledgement to do so
+                //channel.BasicConsume(Configuration.Name, false, consumer);
+                Channels[i].BasicConsume(Configuration.Name, false, Consumers[i]);
+            }
+            // Returning th consumer
+            return this;
         }
 
         #endregion
