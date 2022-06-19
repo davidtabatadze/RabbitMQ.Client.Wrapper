@@ -47,6 +47,12 @@ namespace RabbitMQ.Client.Wrapper
         public Dictionary<string, object> Arguments { get; set; }
 
         /// <summary>
+        /// Bindings <see cref="RabbitConfigurationBinding"/>
+        /// </summary>
+        /// <remarks>Named exchange/queue should already exist, it will not be created</remarks>
+        public List<RabbitConfigurationBinding> Bindings { get; set; }
+
+        /// <summary>
         /// Dependencies <see cref="RabbitConfigurationDependency"/>
         /// </summary>
         public List<RabbitConfigurationDependency> Dependencies { get; set; }

@@ -245,7 +245,7 @@ namespace RabbitMQ.Client.Wrapper
                 //channel.BasicConsume(Configuration.Name, false, consumer);
                 Channels[i].BasicConsume(Configuration.Name, false, Consumers[i]);
             }
-            // Returning th consumer
+            // Returning this consumer
             return this;
         }
 

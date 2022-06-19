@@ -134,6 +134,7 @@ namespace RabbitMQ.Client.Wrapper
                 Arguments = configuration.Arguments;
             }
             // Base fixings
+            configuration.Bindings ??= new List<RabbitConfigurationBinding> { };
             configuration.Dependencies ??= new List<RabbitConfigurationDependency> { };
             // Base validations
             var invalid = configuration == null ? "Configuration" :
@@ -244,6 +245,13 @@ namespace RabbitMQ.Client.Wrapper
                 }
                 // Declaring queue and bindings
                 DeclareQueue(channel, configuration.Name, bindings);
+
+                // ***
+
+                DeclareBindings(channel, configuration.Name, configuration.Bindings);
+
+                // ***
+
                 // Registering channel
                 Channels.Add(channel);
             }
@@ -338,6 +346,24 @@ namespace RabbitMQ.Client.Wrapper
                         routingKey: binding.Value
                     );
                 }
+            }
+        }
+
+        /// <summary>
+        /// ???
+        /// </summary>
+        /// <param name="channel"></param>
+        /// <param name="queue"></param>
+        /// <param name="bindings"></param>
+        private void DeclareBindings(IModel channel, string queue, List<RabbitConfigurationBinding> bindings)
+        {
+            foreach (var binding in bindings)
+            {
+                channel.QueueBind(
+                    queue: queue,
+                    exchange: binding.Name,
+                    routingKey: binding.Route
+                );
             }
         }
 

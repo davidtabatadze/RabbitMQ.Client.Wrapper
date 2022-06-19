@@ -6,18 +6,8 @@ namespace RabbitMQ.Client.Wrapper
     /// <summary>
     /// Represents RabbitMQ configuration for dependencies such as exchanges or queues
     /// </summary>
-    public class RabbitConfigurationDependency
+    public class RabbitConfigurationDependency : RabbitConfigurationBinding
     {
-
-        /// <summary>
-        /// Routing / Binding key
-        /// </summary>
-        public string Route { get; set; }
-
-        /// <summary>
-        /// Name of the exchange/queue
-        /// </summary>
-        public string Name { get; set; }
 
         /// <summary>
         /// Type of the exchange
