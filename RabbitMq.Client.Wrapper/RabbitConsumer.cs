@@ -103,6 +103,7 @@ namespace RabbitMQ.Client.Wrapper
         /// <param name="batchSize">Grouping size for messages</param>
         /// <param name="retryIntervals">Retry intervals in milliseconds</param>
         /// <param name="dependencies">Dependencies <see cref="RabbitConfigurationDependency"/></param>
+        /// <param name="bindings">Bindings <see cref="RabbitConfigurationBinding"/></param>
         public RabbitConsumer(
             RabbitConfigurationBase configuration,
             ILogger logger = null,
@@ -110,9 +111,10 @@ namespace RabbitMQ.Client.Wrapper
             ushort workers = 0,
             ushort batchSize = 0,
             List<ulong> retryIntervals = null,
-            List<RabbitConfigurationDependency> dependencies = null
+            List<RabbitConfigurationDependency> dependencies = null,
+            List<RabbitConfigurationBinding> bindings = null
         ) : this(
-            RabbitConfigurationBase.ToConsumerConfiguration(configuration, name, workers, batchSize, retryIntervals, dependencies),
+            RabbitConfigurationBase.ToConsumerConfiguration(configuration, name, workers, batchSize, retryIntervals, dependencies, bindings),
             logger
         )
         { }

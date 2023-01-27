@@ -210,7 +210,7 @@ namespace RabbitMQ.Client.Wrapper
                           string.Empty;
             if (!string.IsNullOrWhiteSpace(invalid))
             {
-                throw new ArgumentException(RabbitAnnotations.Exception.FactoryArgumentExceptionConsumer, "Dependecies." + invalid);
+                throw new ArgumentException(RabbitAnnotations.Exception.FactoryArgumentExceptionConsumer, "Dependencies." + invalid);
             }
             if (configuration.Dependencies.Any(dependency => !AllowedExchangeTypes.Contains(dependency.Type)))
             {

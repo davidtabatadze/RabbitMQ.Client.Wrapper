@@ -99,6 +99,7 @@ namespace RabbitMQ.Client.Wrapper
         /// <param name="batchSize">Grouping size for messages</param>
         /// <param name="retryIntervals">Retry intervals in milliseconds</param>
         /// <param name="dependencies">Dependencies <see cref="RabbitConfigurationDependency"/></param>
+        /// <param name="bindings">Bindings <see cref="RabbitConfigurationBinding"/></param>
         /// <returns>Fresh instance of <see cref="RabbitConsumerConfiguration"/></returns>
         internal static RabbitConsumerConfiguration ToConsumerConfiguration(
             RabbitConfigurationBase configuration,
@@ -106,7 +107,8 @@ namespace RabbitMQ.Client.Wrapper
             ushort workers = 0,
             ushort batchSize = 0,
             List<ulong> retryIntervals = null,
-            List<RabbitConfigurationDependency> dependencies = null
+            List<RabbitConfigurationDependency> dependencies = null,
+            List<RabbitConfigurationBinding> bindings = null
         )
         {
             // Composing consumer configuration
@@ -122,7 +124,8 @@ namespace RabbitMQ.Client.Wrapper
                 Workers = workers,
                 BatchSize = batchSize,
                 RetryIntervals = retryIntervals,
-                Dependencies = dependencies
+                Dependencies = dependencies,
+                Bindings = bindings
             };
         }
 
